@@ -1,0 +1,95 @@
+[project]
+name = "pokercoach"
+version = "0.1.0"
+description = "AI-powered poker coaching system with GTO solver integration"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+    { name = "Will" }
+]
+keywords = ["poker", "gto", "solver", "coaching", "machine-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Games/Entertainment",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Core
+    "pydantic>=2.0",
+    "numpy>=1.24",
+
+    # LLM
+    "anthropic>=0.18",
+    "openai>=1.0",
+
+    # Vision
+    "opencv-python>=4.8",
+    "mss>=9.0",
+    "easyocr>=1.7",
+    "pillow>=10.0",
+
+    # Hand History
+    "poker-log-parser>=0.1",
+
+    # Database
+    "sqlalchemy>=2.0",
+    "alembic>=1.12",
+
+    # Web
+    "fastapi>=0.109",
+    "uvicorn[standard]>=0.27",
+    "websockets>=12.0",
+
+    # Utils
+    "rich>=13.0",
+    "typer>=0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.1",
+    "mypy>=1.8",
+    "pre-commit>=3.6",
+]
+
+rl = [
+    # For Phase 4 RL-based exploitation
+    "torch>=2.1",
+    "ray>=2.9",
+]
+
+[project.scripts]
+pokercoach = "pokercoach.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pokercoach"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]  # Line length handled by formatter
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra -q --cov=src/pokercoach --cov-report=term-missing"
