@@ -1,40 +1,263 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+PokerCoach is an AI-powered poker coaching system with GTO solver integration. This document provides everything an agent needs to work on this codebase.
 
-## Quick Reference
+## Project Overview
+
+- **Language**: Python 3.11+
+- **Package Manager**: uv
+- **Architecture**: LLM coach augmented with GTO solver tools
+- **Key Modules**: core (game state), solver (TexasSolver), llm (coach), vision (screen capture), analysis (hand history), opponent (profiling)
+
+## Development Commands
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+# Setup
+uv sync --extra dev          # Install all dependencies
+
+# Quality Gates (run before any commit)
+uv run pytest                # Run tests with coverage
+uv run ruff check src/       # Lint
+uv run ruff format src/      # Format
+uv run mypy src/             # Type check
+
+# Run application
+uv run pokercoach --help     # CLI
+uv run pokercoach serve      # Web server
 ```
+
+## Quality Gates
+
+**All code changes MUST pass these checks before completion:**
+
+| Check | Command | Must Pass |
+|-------|---------|-----------|
+| Tests | `uv run pytest` | Yes |
+| Lint | `uv run ruff check src/` | Yes |
+| Types | `uv run mypy src/` | Yes |
+| Format | `uv run ruff format --check src/` | Yes |
+
+Quick validation script:
+```bash
+uv run pytest && uv run ruff check src/ && uv run mypy src/
+```
+
+## Project Structure
+
+```
+src/pokercoach/
+  core/           # GameState, Card, Hand, Board, Action models
+  solver/         # SolverBridge ABC, TexasSolver implementation
+  llm/            # PokerCoach class, prompts, tools
+  vision/         # ScreenCapture, CardDetector, OCR
+  analysis/       # HandHistoryParser, HandEvaluator, LeakDetector
+  opponent/       # PlayerStats, OpponentProfiler, ExploitationEngine
+  web/            # FastAPI app, routes
+
+tests/
+  unit/           # Unit tests (test_game_state.py, test_opponent_stats.py)
+  integration/    # Integration tests (test_api.py)
+
+thoughts/beads/   # Markdown-based work tracking (Phase 1 beads)
+docs/             # Architecture documentation
+```
+
+## Beads System
+
+This project uses two bead tracking systems:
+
+### 1. Markdown Beads (`thoughts/beads/`)
+
+Atomic work units with acceptance criteria. Structure:
+```
+thoughts/beads/
+├── backlog/       # Ready to execute
+├── in-progress/   # Currently being worked
+├── completed/     # Done
+└── blocked/       # Needs resolution
+```
+
+**Bead Format** (`BEAD-NNN-short-name.md`):
+```yaml
+---
+id: BEAD-NNN
+title: Short title
+phase: 1
+priority: P0/P1/P2
+dependencies: [BEAD-XXX]
+files:
+  - path/to/file.py
+---
+
+## Context
+What and why.
+
+## Acceptance Criteria
+- [ ] Criterion with testable command
+- [ ] `pytest tests/unit/test_foo.py` passes
+
+## Implementation Notes
+Guidance for implementation.
+```
+
+**Workflow**:
+1. Read bead from `backlog/`
+2. Move to `in-progress/` (rename file)
+3. Implement and run acceptance criteria
+4. Move to `completed/` on success
+5. Move to `blocked/` if stuck (add blocker note)
+
+### 2. BD CLI (`.beads/`)
+
+Git-backed issue tracking. Commands:
+```bash
+bd ready                           # Find available work
+bd show <id>                       # View issue details
+bd update <id> --status in_progress  # Claim work
+bd close <id>                      # Complete work
+bd sync                            # Sync with git
+```
+
+## God Ralph Integration
+
+For autonomous execution of beads with validation:
+
+### Prerequisites
+1. Beads must be in `bd` database (not just markdown)
+2. Each bead needs **executable** acceptance criteria
+3. Acceptance criteria should be shell commands that exit 0 on success
+
+### Creating Ralph-Ready Beads
+
+Use `/god-ralph plan` or create manually:
+```bash
+bd create --title="Implement X" --type=task --priority=2
+bd update <id> --acceptance-criteria="uv run pytest tests/unit/test_x.py"
+```
+
+### Running God Ralph
+
+```bash
+/god-ralph start    # Start orchestrator (runs ready beads in parallel)
+/god-ralph status   # Check progress
+/god-ralph stop     # Stop gracefully
+```
+
+### Validation Flow
+
+God Ralph workers:
+1. Claim bead, mark `in_progress`
+2. Implement based on context/acceptance criteria
+3. Run acceptance criteria commands
+4. If pass → `bd close <id>`
+5. If fail → iterate or create fix-bead
+
+## Phase 1 Beads (Current Work)
+
+| ID | Title | Priority | Dependencies | Validation |
+|----|-------|----------|--------------|------------|
+| BEAD-001 | GameState.to_solver_format() | P0 | - | `pytest tests/unit/test_game_state.py` |
+| BEAD-002 | Acquire TexasSolver binary | P0 | - | Binary exists at expected path |
+| BEAD-003 | Solution/Strategy data types | P0 | - | Type check passes |
+| BEAD-004 | TexasSolver _build_command() | P1 | 001, 002 | Unit tests pass |
+| BEAD-005 | TexasSolver _parse_output() | P1 | 003, 004 | Unit tests pass |
+| BEAD-006 | Precomputed solution cache | P2 | 003, 005 | Cache hit/miss tests |
+| BEAD-007 | LLM query_gto tool | P1 | 003, 005 | Integration test |
+| BEAD-008 | LLM explain_line tool | P2 | 007 | Integration test |
+| BEAD-009 | LLM compare_actions tool | P2 | 007 | Integration test |
+| BEAD-010 | Coach integration E2E | P1 | 005, 007-009 | E2E test suite |
+
+**Critical Path**: 001+002+003 (parallel) → 004 → 005 → 007 → 010
+
+## Code Style
+
+- **Formatting**: ruff format (100 char line length)
+- **Linting**: ruff with E, F, I, N, W, UP, B, C4, SIM rules
+- **Types**: mypy strict mode
+- **Tests**: pytest with coverage, asyncio_mode=auto
+
+## Key Patterns
+
+### Solver Bridge (Strategy Pattern)
+```python
+class SolverBridge(ABC):
+    @abstractmethod
+    def solve(self, game_state: GameState) -> Solution: ...
+```
+
+### Game State Conversion
+```python
+game_state.to_solver_format()  # Returns solver-compatible string
+```
+
+### LLM Tools
+Tools defined in `llm/coach.py`: `query_gto`, `compare_actions`, `explain_line`
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**MANDATORY**: Work is NOT complete until `git push` succeeds.
 
-**MANDATORY WORKFLOW:**
+### Checklist
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+```bash
+# 1. Run quality gates
+uv run pytest && uv run ruff check src/ && uv run mypy src/
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+# 2. Stage changes
+git status
+git add <files>
 
+# 3. Sync beads
+bd sync
+
+# 4. Commit
+git commit -m "Description of changes
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 5. Push
+git pull --rebase
+git push
+
+# 6. Verify
+git status  # Must show "up to date with origin"
+```
+
+### Critical Rules
+
+- **NEVER** stop before pushing - work is stranded locally
+- **NEVER** say "ready to push when you are" - YOU must push
+- **ALWAYS** run quality gates before committing
+- **ALWAYS** sync beads before pushing
+- If push fails, resolve and retry until success
+
+### Handoff
+
+When ending a session, provide:
+1. What was completed
+2. What's in progress (with bead IDs)
+3. Any blockers discovered
+4. Suggested next steps
+
+## Troubleshooting
+
+### Tests Failing
+```bash
+uv run pytest -v --tb=short  # Verbose with short traceback
+uv run pytest tests/unit/test_specific.py::test_name  # Run single test
+```
+
+### Type Errors
+```bash
+uv run mypy src/ --show-error-codes  # Show error codes
+```
+
+### Lint Fixes
+```bash
+uv run ruff check src/ --fix  # Auto-fix what's possible
+```
+
+### Dependency Issues
+```bash
+uv sync --refresh  # Refresh lockfile
+```
