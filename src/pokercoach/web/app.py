@@ -22,11 +22,12 @@ def create_app() -> FastAPI:
     )
 
     # Register routes
-    from pokercoach.web.routes import analysis, coach, opponents
+    from pokercoach.web.routes import analysis, coach, game_state, opponents
 
     app.include_router(coach.router, prefix="/api/coach", tags=["coach"])
     app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
     app.include_router(opponents.router, prefix="/api/opponents", tags=["opponents"])
+    app.include_router(game_state.router, prefix="/api", tags=["game-state"])
 
     @app.get("/")
     async def root():

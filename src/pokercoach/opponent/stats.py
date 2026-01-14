@@ -1,7 +1,128 @@
 """HUD-style player statistics."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional
+from enum import Enum
+
+
+class Position(Enum):
+    """Player positions at a poker table."""
+
+    UTG = "utg"
+    UTG1 = "utg1"
+    UTG2 = "utg2"
+    MP = "mp"
+    MP1 = "mp1"
+    MP2 = "mp2"
+    HJ = "hj"  # Hijack
+    CO = "co"  # Cutoff
+    BTN = "btn"  # Button
+    SB = "sb"  # Small blind
+    BB = "bb"  # Big blind
+
+
+class Street(Enum):
+    """Betting streets in poker."""
+
+    PREFLOP = "preflop"
+    FLOP = "flop"
+    TURN = "turn"
+    RIVER = "river"
+
+
+class ActionType(Enum):
+    """Types of poker actions."""
+
+    FOLD = "fold"
+    CHECK = "check"
+    CALL = "call"
+    BET = "bet"
+    RAISE = "raise"
+    ALL_IN = "all_in"
+
+
+@dataclass
+class BetSizingPattern:
+    """Tracks bet sizing patterns for a player."""
+
+    # Bet sizes as percentage of pot (count occurrences in ranges)
+    small_bets: int = 0  # < 33% pot
+    medium_bets: int = 0  # 33-66% pot
+    large_bets: int = 0  # 66-100% pot
+    overbet: int = 0  # > 100% pot
+    total_bets: int = 0
+
+    # Average bet sizes by street (as % of pot)
+    avg_flop_bet_size: float = 0.0
+    avg_turn_bet_size: float = 0.0
+    avg_river_bet_size: float = 0.0
+
+    # Raise sizes (as multiple of previous bet)
+    avg_raise_size: float = 0.0
+    min_raise_count: int = 0  # Just min-raises
+    standard_raise_count: int = 0  # 2.5-3x
+    large_raise_count: int = 0  # > 3x
+
+    @property
+    def small_bet_pct(self) -> float:
+        """Percentage of bets that are small."""
+        return (self.small_bets / self.total_bets * 100) if self.total_bets > 0 else 0.0
+
+    @property
+    def overbet_pct(self) -> float:
+        """Percentage of bets that are overbets."""
+        return (self.overbet / self.total_bets * 100) if self.total_bets > 0 else 0.0
+
+
+@dataclass
+class PositionalStats:
+    """Stats for a specific position."""
+
+    hands: int = 0
+    vpip: float = 0.0
+    pfr: float = 0.0
+    three_bet: float = 0.0
+    fold_to_3bet: float = 0.0
+    cbet_flop: float = 0.0
+    wtsd: float = 0.0
+
+
+@dataclass
+class HandAction:
+    """A single action taken in a hand."""
+
+    street: Street
+    action_type: ActionType
+    amount: float = 0.0  # Bet/raise amount
+    pot_size: float = 0.0  # Pot size at time of action
+    position: Position | None = None
+
+    @property
+    def bet_size_pct(self) -> float:
+        """Bet size as percentage of pot."""
+        if self.pot_size == 0:
+            return 0.0
+        return (self.amount / self.pot_size) * 100
+
+
+@dataclass
+class HandRecord:
+    """Raw data from a single hand for a player."""
+
+    hand_id: str
+    timestamp: str  # ISO format
+    position: Position
+    hole_cards: str | None = None  # e.g., "AhKs" if known
+    actions: list[HandAction] = field(default_factory=list)
+    went_to_showdown: bool = False
+    won_at_showdown: bool = False
+    won_without_showdown: bool = False
+    profit_bb: float = 0.0  # Profit in big blinds
+
+    def add_action(self, action: HandAction) -> None:
+        """Add an action to this hand record."""
+        self.actions.append(action)
 
 
 @dataclass
@@ -43,6 +164,42 @@ class PlayerStats:
     # Aggression
     aggression_factor: float = 0.0  # (Bet + Raise) / Call
     aggression_frequency: float = 0.0  # (Bet + Raise) / (Bet + Raise + Call + Fold)
+
+    # Positional stats (keyed by Position enum value)
+    positional_stats: dict[str, PositionalStats] = field(default_factory=dict)
+
+    # Bet sizing patterns
+    bet_sizing: BetSizingPattern = field(default_factory=BetSizingPattern)
+
+    # Per-hand raw data storage (recent hands, capped for memory)
+    hand_history: list[HandRecord] = field(default_factory=list)
+    max_hand_history: int = 1000  # Max hands to keep in memory
+
+    def add_hand_record(self, hand: HandRecord) -> None:
+        """Add a hand record, maintaining the max history limit."""
+        self.hand_history.append(hand)
+        if len(self.hand_history) > self.max_hand_history:
+            # Remove oldest hands
+            self.hand_history = self.hand_history[-self.max_hand_history :]
+
+    def get_positional_stats(self, position: Position) -> PositionalStats:
+        """Get stats for a specific position."""
+        pos_key = position.value
+        if pos_key not in self.positional_stats:
+            self.positional_stats[pos_key] = PositionalStats()
+        return self.positional_stats[pos_key]
+
+    def set_positional_stats(self, position: Position, stats: PositionalStats) -> None:
+        """Set stats for a specific position."""
+        self.positional_stats[position.value] = stats
+
+    def get_recent_hands(self, n: int = 10) -> list[HandRecord]:
+        """Get the n most recent hands."""
+        return self.hand_history[-n:] if self.hand_history else []
+
+    def get_hands_at_position(self, position: Position) -> list[HandRecord]:
+        """Get all hands played at a specific position."""
+        return [h for h in self.hand_history if h.position == position]
 
     @property
     def is_nit(self) -> bool:
@@ -125,7 +282,6 @@ class StatsAccumulator:
 
     def to_stats(self) -> PlayerStats:
         """Convert accumulated data to PlayerStats."""
-        total_actions = self.bets + self.raises + self.calls
         af = (self.bets + self.raises) / self.calls if self.calls > 0 else 0
 
         return PlayerStats(
@@ -145,7 +301,7 @@ class StatsAccumulator:
 class StatsCalculator:
     """Calculate player stats from hand histories."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._accumulators: dict[str, StatsAccumulator] = {}
 
     def get_accumulator(self, player_id: str) -> StatsAccumulator:
@@ -154,7 +310,7 @@ class StatsCalculator:
             self._accumulators[player_id] = StatsAccumulator()
         return self._accumulators[player_id]
 
-    def process_hand(self, hand_data: dict) -> None:
+    def process_hand(self, hand_data: dict[str, object]) -> None:
         """
         Process a single hand to update player stats.
 
@@ -165,7 +321,7 @@ class StatsCalculator:
         # Extract each player's actions and update their accumulator
         raise NotImplementedError("Hand processing not yet implemented")
 
-    def get_stats(self, player_id: str) -> Optional[PlayerStats]:
+    def get_stats(self, player_id: str) -> PlayerStats | None:
         """
         Get calculated stats for a player.
 

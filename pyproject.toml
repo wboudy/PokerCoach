@@ -21,32 +21,25 @@ dependencies = [
     # Core
     "pydantic>=2.0",
     "numpy>=1.24",
-
     # LLM
     "anthropic>=0.18",
     "openai>=1.0",
-
     # Vision
     "opencv-python>=4.8",
     "mss>=9.0",
     "easyocr>=1.7",
     "pillow>=10.0",
-
-    # Hand History
-    "poker-log-parser>=0.1",
-
     # Database
     "sqlalchemy>=2.0",
     "alembic>=1.12",
-
     # Web
     "fastapi>=0.109",
     "uvicorn[standard]>=0.27",
     "websockets>=12.0",
-
     # Utils
     "rich>=13.0",
     "typer>=0.9",
+    "python-multipart>=0.0.21",
 ]
 
 [project.optional-dependencies]
@@ -63,6 +56,11 @@ rl = [
     # For Phase 4 RL-based exploitation
     "torch>=2.1",
     "ray>=2.9",
+]
+
+handhistory = [
+    # Hand history parsing (requires Rust toolchain)
+    "poker-log-parser>=0.1",
 ]
 
 [project.scripts]

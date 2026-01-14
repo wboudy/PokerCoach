@@ -1,14 +1,15 @@
 {
-  "status": "completed_batch_1",
-  "started_at": "2026-01-14T04:55:00Z",
-  "completed_at": "2026-01-14T05:08:00Z",
-  "active_ralphs": [],
-  "completed_beads": [
-    {"id": "PokerCoach-qs6", "title": "Build TexasSolver from source", "status": "closed"},
-    {"id": "PokerCoach-2se", "title": "GameState.to_solver_format()", "status": "closed"},
-    {"id": "PokerCoach-ycm", "title": "Design hand storage schema", "status": "closed"}
+  "status": "running",
+  "started_at": "2026-01-14T05:15:00Z",
+  "batch": 2,
+  "active_ralphs": [
+    {"id": "a317d81", "bead": "PokerCoach-8sc", "task": "_build_command"},
+    {"id": "a096216", "bead": "PokerCoach-22u", "task": "HandRepository CRUD"},
+    {"id": "a6e3383", "bead": "PokerCoach-gg8", "task": "opponent stats schema"},
+    {"id": "ae274b2", "bead": "PokerCoach-bix", "task": "coaching window layout"},
+    {"id": "ad3afe6", "bead": "PokerCoach-1tz", "task": "game state sync"}
   ],
+  "completed_beads": [],
   "failed_beads": [],
-  "total_iterations": 0,
-  "next_ready": ["PokerCoach-8sc", "PokerCoach-22u"]
+  "total_iterations": 0
 }
