@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from sqlalchemy import (
     Column,
@@ -156,13 +155,13 @@ class HandRecord(Base):
     board = Column(String(50))  # Legacy field: full board as string
 
     # Position and table info
-    position = Column(SQLEnum(Position))
+    position: Column[Position | None] = Column(SQLEnum(Position))
     table_size = Column(Integer)  # 2-10 players
     button_seat = Column(Integer)
     hero_seat = Column(Integer)
 
     # Hand categorization for efficient querying
-    hand_type = Column(SQLEnum(HandType))
+    hand_type: Column[HandType | None] = Column(SQLEnum(HandType))
     is_suited = Column(Integer, default=0)  # 0 or 1
     is_pocket_pair = Column(Integer, default=0)  # 0 or 1
     is_broadway = Column(Integer, default=0)  # 0 or 1
@@ -215,11 +214,11 @@ class ActionRecord(Base):
 
     # Action sequence
     sequence = Column(Integer, nullable=False)  # Order within the hand
-    street = Column(SQLEnum(Street), nullable=False)
+    street: Column[Street] = Column(SQLEnum(Street), nullable=False)
     street_sequence = Column(Integer)  # Order within the street
 
     # Action details
-    action_type = Column(SQLEnum(ActionType), nullable=False)
+    action_type: Column[ActionType] = Column(SQLEnum(ActionType), nullable=False)
     amount = Column(Float)  # Bet/raise amount (null for fold/check)
     total_bet = Column(Float)  # Total committed this street
     pot_before = Column(Float)  # Pot size before action
@@ -228,7 +227,7 @@ class ActionRecord(Base):
     stack_after = Column(Float)  # Player stack after action
 
     # Position context
-    position = Column(SQLEnum(Position))
+    position: Column[Position | None] = Column(SQLEnum(Position))
     is_hero = Column(Integer, default=0)  # 0 or 1
 
     # Analysis (for hero actions)

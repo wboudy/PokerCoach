@@ -1,10 +1,10 @@
 """Database access layer."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from pokercoach.storage.models import Base, HandRecord, PlayerRecord, SessionRecord
 
@@ -12,7 +12,7 @@ from pokercoach.storage.models import Base, HandRecord, PlayerRecord, SessionRec
 class Database:
     """Database manager for PokerCoach."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         """
         Initialize database connection.
 
@@ -46,7 +46,7 @@ class Database:
                 session.refresh(player)
             return player
 
-    def get_player(self, player_id: str) -> Optional[PlayerRecord]:
+    def get_player(self, player_id: str) -> PlayerRecord | None:
         """Get player by ID."""
         with self.get_session() as session:
             return (
@@ -58,8 +58,8 @@ class Database:
     def update_player_stats(
         self,
         player_id: str,
-        stats: dict,
-    ) -> Optional[PlayerRecord]:
+        stats: dict[str, Any],
+    ) -> PlayerRecord | None:
         """Update player statistics."""
         with self.get_session() as session:
             player = (
