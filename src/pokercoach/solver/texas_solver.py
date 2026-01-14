@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pokercoach.core.game_state import Action, GameState, Hand
+from pokercoach.core.game_state import Action, ActionType, Card, GameState, Hand, Position, Suit
 from pokercoach.solver.bridge import Solution, SolverBridge, Strategy
 
 # Default ranges for common spots
@@ -169,9 +169,69 @@ class TexasSolverBridge(SolverBridge):
         return "\n".join(lines)
 
     def _parse_output(self, output: str, game_state: GameState) -> Solution:
-        """Parse solver JSON output into Solution object."""
-        # TODO: Implement output parsing
-        raise NotImplementedError("Output parsing not yet implemented")
+        """
+        Parse solver JSON output into Solution object.
+
+        Args:
+            output: JSON string from solver output
+            game_state: Original game state that was solved
+
+        Returns:
+            Solution object with strategies, EVs, and convergence metrics
+
+        Raises:
+            ValueError: If output is empty or invalid JSON
+        """
+        if not output or not output.strip():
+            raise ValueError("Empty solver output")
+
+        try:
+            data = json.loads(output)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in solver output: {e}") from e
+
+        # Extract top-level metrics
+        exploitability = data.get("exploitability", 0.0)
+        iterations = data.get("iterations", 0)
+
+        # Extract strategies and EVs from root node
+        root = data.get("root", {})
+        raw_strategies = root.get("strategy", {})
+        raw_evs = root.get("ev", {})
+
+        # Build Strategy objects for each hand
+        strategies: dict[str, Strategy] = {}
+        for hand_str, action_freqs in raw_strategies.items():
+            # Convert action names to ActionType enum
+            actions: dict[ActionType, float] = {}
+            for action_name, freq in action_freqs.items():
+                try:
+                    action_type = ActionType(action_name.lower())
+                    actions[action_type] = freq
+                except ValueError:
+                    # Skip unknown action types
+                    continue
+
+            # Create Hand object for the strategy
+            try:
+                hand = Hand.from_string(hand_str)
+                strategies[hand_str] = Strategy(hand=hand, actions=actions)
+            except ValueError:
+                # Skip hands that can't be parsed
+                continue
+
+        # Extract EVs
+        evs: dict[str, float] = {}
+        for hand_str, ev_value in raw_evs.items():
+            evs[hand_str] = float(ev_value)
+
+        return Solution(
+            game_state=game_state,
+            strategies=strategies,
+            ev=evs,
+            convergence=exploitability,
+            iterations=iterations,
+        )
 
     def solve(
         self,
@@ -232,9 +292,121 @@ class PrecomputedSolver(SolverBridge):
         self._cache: dict[str, Solution] = {}
 
     def _cache_key(self, game_state: GameState) -> str:
-        """Generate cache key from game state."""
-        # TODO: Implement canonical game state hashing
-        raise NotImplementedError
+        """Generate cache key from game state.
+
+        Normalizes the game state for cache lookup using:
+        - Stack bucketing (100bb buckets)
+        - Pot as percentage of stack
+        - Suit isomorphism (canonicalize board texture)
+        - Relative position (IP/OOP)
+
+        Args:
+            game_state: Current game state to generate key for
+
+        Returns:
+            Canonical string key for cache lookup
+        """
+        parts: list[str] = []
+
+        # 1. Stack bucketing - round to nearest 100bb bucket
+        stack_bucket = int(game_state.effective_stack // 100) * 100
+        if stack_bucket == 0:
+            stack_bucket = 100  # Minimum bucket
+        parts.append(f"stack{stack_bucket}")
+
+        # 2. Pot as percentage of stack (rounded to nearest 10%)
+        if game_state.effective_stack > 0:
+            pot_pct = int(round(game_state.pot / game_state.effective_stack * 10)) * 10
+        else:
+            pot_pct = 0
+        parts.append(f"pot{pot_pct}")
+
+        # 3. Board texture with suit isomorphism
+        if game_state.board.cards:
+            canonical_board = self._canonicalize_board(game_state.board.cards)
+            parts.append(f"board_{canonical_board}")
+        else:
+            parts.append("preflop")
+
+        # 4. Position normalization (simplified to IP/OOP concept)
+        if game_state.hero_position:
+            # BTN, CO, HJ are typically IP positions
+            ip_positions = {Position.BTN, Position.CO, Position.HJ}
+            if game_state.hero_position in ip_positions:
+                parts.append("ip")
+            else:
+                parts.append("oop")
+        else:
+            parts.append("unk")
+
+        return "_".join(parts)
+
+    def _canonicalize_board(self, cards: list[Card]) -> str:
+        """Canonicalize board cards with suit isomorphism.
+
+        Transforms suits to a canonical form where:
+        - First suit seen becomes 'a'
+        - Second unique suit becomes 'b'
+        - And so on...
+
+        This ensures Ah Kd 2c produces the same key as As Kh 2d.
+
+        However, we preserve flush draw information by tracking
+        how many cards share each suit.
+
+        Args:
+            cards: List of Card objects
+
+        Returns:
+            Canonical board string
+        """
+        if not cards:
+            return "empty"
+
+        # Map original suits to canonical suits
+        suit_map: dict[Suit, str] = {}
+        canonical_suits = ['a', 'b', 'c', 'd']
+        next_canonical = 0
+
+        # Count suits for flush texture
+        suit_counts: dict[Suit, int] = {}
+        for card in cards:
+            suit_counts[card.suit] = suit_counts.get(card.suit, 0) + 1
+
+        # Sort cards by rank (descending) for consistent ordering
+        sorted_cards = sorted(cards, key=lambda c: -c.rank.value_int)
+
+        canonical_parts = []
+        for card in sorted_cards:
+            # Get or assign canonical suit
+            if card.suit not in suit_map:
+                suit_map[card.suit] = canonical_suits[next_canonical]
+                next_canonical = min(next_canonical + 1, 3)
+
+            canonical_parts.append(f"{card.rank.value}{suit_map[card.suit]}")
+
+        # Add texture indicator based on suit distribution
+        texture = self._get_board_texture(suit_counts)
+
+        return f"{'-'.join(canonical_parts)}_{texture}"
+
+    def _get_board_texture(self, suit_counts: dict[Suit, int]) -> str:
+        """Determine board texture from suit counts.
+
+        Args:
+            suit_counts: Dict mapping suits to count of cards
+
+        Returns:
+            Texture string: 'mono' (3 suited), 'fd' (2 suited), 'rainbow'
+        """
+        max_suited = max(suit_counts.values()) if suit_counts else 0
+
+        if max_suited >= 3:
+            return "mono"  # Monotone (flush possible)
+        elif max_suited == 2:
+            return "fd"  # Flush draw
+        else:
+            return "rainbow"  # No flush draw
 
     def solve(
         self,
@@ -251,7 +423,7 @@ class PrecomputedSolver(SolverBridge):
         cache_file = self.cache_dir / f"{key}.json"
         if cache_file.exists():
             with open(cache_file) as f:
-                data = json.load(f)
+                _data = json.load(f)  # noqa: F841
                 # TODO: Deserialize solution
                 raise NotImplementedError
 

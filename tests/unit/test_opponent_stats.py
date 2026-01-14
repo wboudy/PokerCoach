@@ -293,3 +293,225 @@ class TestOpponentProfiler:
         assert profile.player_id == "player123"
         assert profile.player_type == PlayerType.TAG
         assert profile.confidence == "high"  # 200 hands = high confidence
+
+
+def test_stats_calculator():
+    """Test StatsCalculator computes stats from hand histories."""
+    from pokercoach.opponent.stats import (
+        ActionType,
+        HandAction,
+        HandRecord,
+        Position,
+        StatsCalculator,
+        Street,
+    )
+
+    calc = StatsCalculator()
+
+    # Process hand 1: BTN raises preflop, cbets flop, goes to showdown
+    hand1 = HandRecord(
+        hand_id="hand_001",
+        timestamp="2024-01-15T10:00:00Z",
+        position=Position.BTN,
+        hole_cards="AhKs",
+        went_to_showdown=True,
+        won_at_showdown=True,
+    )
+    hand1.add_action(
+        HandAction(
+            street=Street.PREFLOP,
+            action_type=ActionType.RAISE,
+            amount=6.0,
+            pot_size=3.0,
+            position=Position.BTN,
+        )
+    )
+    hand1.add_action(
+        HandAction(
+            street=Street.FLOP,
+            action_type=ActionType.BET,
+            amount=8.0,
+            pot_size=12.0,
+            position=Position.BTN,
+        )
+    )
+    calc.process_hand("player1", hand1)
+
+    # Process hand 2: BTN just calls preflop, folds to flop bet
+    hand2 = HandRecord(
+        hand_id="hand_002",
+        timestamp="2024-01-15T10:05:00Z",
+        position=Position.BTN,
+        hole_cards="9h8h",
+        went_to_showdown=False,
+    )
+    hand2.add_action(
+        HandAction(
+            street=Street.PREFLOP,
+            action_type=ActionType.CALL,
+            amount=2.0,
+            pot_size=3.0,
+            position=Position.BTN,
+        )
+    )
+    hand2.add_action(
+        HandAction(
+            street=Street.FLOP,
+            action_type=ActionType.FOLD,
+            amount=0.0,
+            pot_size=8.0,
+            position=Position.BTN,
+        )
+    )
+    calc.process_hand("player1", hand2)
+
+    # Process hand 3: BTN folds preflop
+    hand3 = HandRecord(
+        hand_id="hand_003",
+        timestamp="2024-01-15T10:10:00Z",
+        position=Position.BTN,
+        hole_cards="7h2c",
+        went_to_showdown=False,
+    )
+    hand3.add_action(
+        HandAction(
+            street=Street.PREFLOP,
+            action_type=ActionType.FOLD,
+            amount=0.0,
+            pot_size=3.0,
+            position=Position.BTN,
+        )
+    )
+    calc.process_hand("player1", hand3)
+
+    # Get stats for player1
+    stats = calc.get_stats("player1")
+    assert stats is not None
+
+    # 3 hands played
+    assert stats.hands_played == 3
+
+    # VPIP: 2 out of 3 hands (raise and call count as VPIP, fold doesn't)
+    assert abs(stats.vpip - 66.67) < 1.0  # ~66.67%
+
+    # PFR: 1 out of 3 hands (only raise counts)
+    assert abs(stats.pfr - 33.33) < 1.0  # ~33.33%
+
+    # WTSD: 1 out of 2 hands that saw flop
+    assert abs(stats.wtsd - 50.0) < 1.0  # 50%
+
+    # WSD: 1 out of 1 hands that went to showdown
+    assert stats.wsd == 100.0
+
+    # Test sample size threshold
+    assert stats.confidence == "very_low"  # < 20 hands
+
+    # Test getting nonexistent player returns None
+    assert calc.get_stats("unknown_player") is None
+
+    # Test get_all_stats
+    all_stats = calc.get_all_stats()
+    assert "player1" in all_stats
+    assert all_stats["player1"].hands_played == 3
+
+    # Test running aggregates update correctly with more hands
+    for i in range(20):
+        hand = HandRecord(
+            hand_id=f"hand_{i+100:03d}",
+            timestamp=f"2024-01-15T11:{i:02d}:00Z",
+            position=Position.CO,
+        )
+        hand.add_action(
+            HandAction(
+                street=Street.PREFLOP,
+                action_type=ActionType.RAISE if i % 3 == 0 else ActionType.FOLD,
+                amount=6.0 if i % 3 == 0 else 0.0,
+                pot_size=3.0,
+                position=Position.CO,
+            )
+        )
+        calc.process_hand("player1", hand)
+
+    updated_stats = calc.get_stats("player1")
+    assert updated_stats is not None
+    assert updated_stats.hands_played == 23  # 3 + 20
+
+    # Confidence should be higher now
+    assert updated_stats.confidence == "low"  # 20-50 hands
+
+
+def test_player_type_classifier():
+    """Test PlayerTypeClassifier correctly classifies player archetypes.
+
+    This is the acceptance criteria test for PokerCoach-rhd.
+    Tests the full classification pipeline including:
+    - NIT, TAG, LAG, FISH, MANIAC, ROCK detection
+    - Confidence scoring based on sample size
+    - Boundary conditions between player types
+    """
+    from pokercoach.opponent.profiler import OpponentProfiler, PlayerType
+    from pokercoach.opponent.stats import PlayerStats
+
+    profiler = OpponentProfiler()
+
+    # Test UNKNOWN for insufficient samples
+    low_sample = PlayerStats(hands_played=15, vpip=25, pfr=20)
+    assert profiler.classify_player_type(low_sample) == PlayerType.UNKNOWN
+    assert low_sample.confidence == "very_low"
+
+    # Test ROCK classification (extremely tight)
+    rock = PlayerStats(hands_played=100, vpip=10, pfr=8)
+    assert profiler.classify_player_type(rock) == PlayerType.ROCK
+
+    # Test NIT classification (tight, passive)
+    nit = PlayerStats(hands_played=100, vpip=14, pfr=10)
+    assert profiler.classify_player_type(nit) == PlayerType.NIT
+
+    # Test TAG classification (tight, aggressive)
+    tag = PlayerStats(hands_played=100, vpip=16, pfr=20)
+    player_type = profiler.classify_player_type(tag)
+    assert player_type == PlayerType.TAG
+
+    # Test LAG classification (loose, aggressive)
+    lag = PlayerStats(hands_played=100, vpip=32, pfr=24)
+    assert profiler.classify_player_type(lag) == PlayerType.LAG
+
+    # Test FISH classification (loose, passive)
+    fish = PlayerStats(hands_played=100, vpip=38, pfr=8)
+    assert profiler.classify_player_type(fish) == PlayerType.FISH
+
+    # Test MANIAC classification (very loose, hyper-aggressive)
+    maniac = PlayerStats(hands_played=100, vpip=45, pfr=35, aggression_factor=4.5)
+    assert profiler.classify_player_type(maniac) == PlayerType.MANIAC
+
+    # Test confidence scoring
+    low_conf = PlayerStats(hands_played=30)
+    med_conf = PlayerStats(hands_played=150)
+    high_conf = PlayerStats(hands_played=350)
+    very_high_conf = PlayerStats(hands_played=600)
+
+    assert low_conf.confidence == "low"
+    assert med_conf.confidence == "medium"
+    assert high_conf.confidence == "high"
+    assert very_high_conf.confidence == "very_high"
+
+    # Test profile building with classification
+    stats = PlayerStats(
+        hands_played=200,
+        vpip=24,
+        pfr=20,
+        three_bet=9,
+        fold_to_3bet=60,
+        aggression_factor=3.0,
+    )
+    profile = profiler.build_profile("test_player", stats)
+
+    assert profile.player_id == "test_player"
+    assert profile.player_type in (PlayerType.TAG, PlayerType.LAG)
+    assert profile.confidence == "high"
+
+    # Test boundary case: VPIP exactly at threshold
+    boundary = PlayerStats(hands_played=100, vpip=18, pfr=18)
+    # Should classify based on the rules (tight+aggressive = TAG)
+    boundary_type = profiler.classify_player_type(boundary)
+    assert boundary_type in (PlayerType.TAG, PlayerType.NIT)

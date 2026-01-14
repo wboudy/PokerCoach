@@ -457,3 +457,159 @@ class TestTexasSolverBridge:
         bridge = TexasSolverBridge(config)
 
         assert bridge.config == config
+
+
+class TestParseOutput:
+    """Tests for TexasSolverBridge._parse_output() method."""
+
+    @pytest.fixture
+    def sample_solver_output(self):
+        """Sample solver JSON output."""
+        return {
+            "exploitability": 0.25,
+            "iterations": 850,
+            "root": {
+                "strategy": {
+                    "AsAh": {"fold": 0.0, "call": 0.15, "raise": 0.85},
+                    "KsKh": {"fold": 0.0, "call": 0.30, "raise": 0.70},
+                    "QsQh": {"fold": 0.05, "call": 0.40, "raise": 0.55},
+                    "AhKs": {"fold": 0.0, "call": 0.25, "raise": 0.75},
+                    "7h2c": {"fold": 0.90, "call": 0.08, "raise": 0.02},
+                },
+                "ev": {
+                    "AsAh": 12.5,
+                    "KsKh": 8.2,
+                    "QsQh": 5.1,
+                    "AhKs": 4.8,
+                    "7h2c": -1.2,
+                },
+            },
+        }
+
+    def test_parse_output_returns_solution(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that _parse_output returns a Solution object."""
+        import json
+
+        game_state = GameState()
+        game_state.pot = 50.0
+        game_state.effective_stack = 200.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        from pokercoach.solver.bridge import Solution
+
+        assert isinstance(solution, Solution)
+
+    def test_parse_output_extracts_strategies(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that strategies are extracted correctly."""
+        import json
+
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        assert "AsAh" in solution.strategies
+        assert "KsKh" in solution.strategies
+        assert "7h2c" in solution.strategies
+
+    def test_parse_output_extracts_evs(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that EVs are extracted correctly."""
+        import json
+
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        assert solution.ev.get("AsAh") == 12.5
+        assert solution.ev.get("KsKh") == 8.2
+        assert solution.ev.get("7h2c") == -1.2
+
+    def test_parse_output_extracts_convergence(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that convergence/exploitability is extracted."""
+        import json
+
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        assert solution.convergence == 0.25
+
+    def test_parse_output_extracts_iterations(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that iteration count is extracted."""
+        import json
+
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        assert solution.iterations == 850
+
+    def test_parse_output_strategy_frequencies(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that strategy action frequencies are correct."""
+        import json
+
+        from pokercoach.core.game_state import ActionType
+
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        aa_strategy = solution.strategies["AsAh"]
+        assert aa_strategy.frequency(ActionType.FOLD) == 0.0
+        assert aa_strategy.frequency(ActionType.CALL) == 0.15
+        assert aa_strategy.frequency(ActionType.RAISE) == 0.85
+
+    def test_parse_output_empty_output(self, solver_bridge: TexasSolverBridge):
+        """Test handling of empty output."""
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        with pytest.raises(ValueError):
+            solver_bridge._parse_output("", game_state)
+
+    def test_parse_output_invalid_json(self, solver_bridge: TexasSolverBridge):
+        """Test handling of invalid JSON."""
+        game_state = GameState()
+        game_state.pot = 50.0
+
+        with pytest.raises(ValueError):
+            solver_bridge._parse_output("not valid json", game_state)
+
+    def test_parse_output_preserves_game_state(
+        self, solver_bridge: TexasSolverBridge, sample_solver_output: dict
+    ):
+        """Test that the solution contains the original game state."""
+        import json
+
+        game_state = GameState()
+        game_state.pot = 75.0
+        game_state.effective_stack = 150.0
+
+        output_json = json.dumps(sample_solver_output)
+        solution = solver_bridge._parse_output(output_json, game_state)
+
+        assert solution.game_state.pot == 75.0
+        assert solution.game_state.effective_stack == 150.0

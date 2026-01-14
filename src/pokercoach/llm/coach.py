@@ -1,7 +1,7 @@
 """Main LLM coach interface with tool access."""
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from pokercoach.core.game_state import GameState, Hand
 from pokercoach.solver.bridge import SolverBridge
@@ -12,7 +12,7 @@ class CoachConfig:
     """Configuration for the poker coach."""
 
     model: str = "claude-sonnet-4-20250514"
-    api_key: Optional[str] = None
+    api_key: str | None = None
     temperature: float = 0.3
     max_tokens: int = 2048
 
@@ -131,10 +131,86 @@ class PokerCoach:
         to_call: float = 0,
         effective_stack: float = 100,
     ) -> str:
-        """Query solver for GTO strategy."""
-        # TODO: Build game state and query solver
-        # For now, return placeholder
-        return f"GTO strategy for {hand} from {position}: [Not yet implemented]"
+        """Query solver for GTO strategy.
+
+        Builds a GameState from the provided parameters and queries the solver
+        for the optimal strategy for the given hand.
+
+        Args:
+            hand: Hero's hand in format like 'AsKs'
+            position: Hero's position (BTN, CO, etc.)
+            board: Board cards like 'Ah Kd 2c' or empty for preflop
+            pot_size: Current pot size in big blinds
+            to_call: Amount to call in big blinds
+            effective_stack: Effective stack in big blinds
+
+        Returns:
+            String describing the GTO strategy with action frequencies
+        """
+        from pokercoach.core.game_state import Card, GameState
+        from pokercoach.core.game_state import Position as GamePosition
+
+        # Build the game state
+        game_state = GameState(
+            pot=pot_size if pot_size > 0 else 3.0,  # Default to standard open pot
+            effective_stack=effective_stack,
+        )
+
+        # Parse position
+        try:
+            game_state.hero_position = GamePosition(position.upper())
+        except (ValueError, KeyError):
+            game_state.hero_position = GamePosition.BTN  # Default to button
+
+        # Parse board cards
+        if board and board.strip():
+            board_cards = board.replace(",", " ").split()
+            for card_str in board_cards:
+                card_str = card_str.strip()
+                if len(card_str) >= 2:
+                    try:
+                        card = Card.from_string(card_str)
+                        game_state.board.add_card(card)
+                    except (ValueError, KeyError):
+                        pass  # Skip invalid cards
+
+        # Parse hero's hand
+        try:
+            hero_hand = Hand.from_string(hand)
+        except (ValueError, KeyError):
+            return f"Invalid hand format: {hand}"
+
+        # Query the solver
+        try:
+            strategy = self.solver.get_strategy(game_state, hero_hand)
+        except Exception as e:
+            return f"Solver error for {hand}: {str(e)}"
+
+        # Format the response with action frequencies
+        lines = [f"GTO Strategy for {hand} from {position}:"]
+
+        if game_state.board.cards:
+            lines.append(f"Board: {game_state.board}")
+
+        lines.append("")
+
+        # Sort actions by frequency (highest first)
+        sorted_actions = sorted(
+            strategy.actions.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        for action_type, frequency in sorted_actions:
+            if frequency > 0.01:  # Only show actions with >1% frequency
+                pct = frequency * 100
+                lines.append(f"  {action_type.value.capitalize()}: {pct:.1f}%")
+
+        # Add primary action recommendation
+        lines.append("")
+        lines.append(f"Primary action: {strategy.primary_action.value.capitalize()}")
+
+        return "\n".join(lines)
 
     def _compare_actions(self, hand: str, actions: list[str]) -> str:
         """Compare EVs of different actions."""
@@ -146,7 +222,7 @@ class PokerCoach:
         # TODO: Query solver and generate explanation
         return f"Explanation for {hand} playing {line}: [Not yet implemented]"
 
-    def ask(self, question: str, game_state: Optional[GameState] = None) -> str:
+    def ask(self, question: str, game_state: GameState | None = None) -> str:
         """
         Ask the coach a poker question.
 

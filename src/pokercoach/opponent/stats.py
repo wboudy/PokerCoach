@@ -299,7 +299,11 @@ class StatsAccumulator:
 
 
 class StatsCalculator:
-    """Calculate player stats from hand histories."""
+    """Calculate player stats from hand histories.
+
+    Processes hands and maintains running aggregates for HUD stats.
+    Supports sample size thresholds for stat reliability.
+    """
 
     def __init__(self) -> None:
         self._accumulators: dict[str, StatsAccumulator] = {}
@@ -310,16 +314,87 @@ class StatsCalculator:
             self._accumulators[player_id] = StatsAccumulator()
         return self._accumulators[player_id]
 
-    def process_hand(self, hand_data: dict[str, object]) -> None:
+    def process_hand(self, player_id: str, hand: HandRecord) -> None:
         """
         Process a single hand to update player stats.
 
+        Extracts actions from the hand and updates running aggregates
+        for VPIP, PFR, WTSD, WSD, aggression, and other HUD stats.
+
         Args:
-            hand_data: Parsed hand data with player actions
+            player_id: Player identifier
+            hand: HandRecord with actions to process
         """
-        # TODO: Implement hand processing
-        # Extract each player's actions and update their accumulator
-        raise NotImplementedError("Hand processing not yet implemented")
+        acc = self.get_accumulator(player_id)
+        acc.hands += 1
+
+        # Track preflop actions for VPIP/PFR
+        has_preflop_action = False
+        put_money_preflop = False
+        raised_preflop = False
+        saw_flop = False
+        is_pfr = False  # Was preflop raiser (for cbet tracking)
+
+        for action in hand.actions:
+            if action.street == Street.PREFLOP:
+                has_preflop_action = True
+                if action.action_type in (ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN):
+                    put_money_preflop = True
+                if action.action_type in (ActionType.RAISE, ActionType.ALL_IN):
+                    raised_preflop = True
+                    is_pfr = True
+
+                # Track aggression
+                if action.action_type == ActionType.CALL:
+                    acc.calls += 1
+                elif action.action_type in (ActionType.BET, ActionType.RAISE, ActionType.ALL_IN):
+                    if action.action_type == ActionType.BET:
+                        acc.bets += 1
+                    else:
+                        acc.raises += 1
+
+            elif action.street == Street.FLOP:
+                saw_flop = True
+                # Track cbet (bet on flop when was preflop raiser)
+                if is_pfr and action.action_type == ActionType.BET:
+                    acc.cbet_flop_counter.add_opportunity(True)
+                elif is_pfr and action.action_type in (ActionType.CHECK, ActionType.FOLD):
+                    acc.cbet_flop_counter.add_opportunity(False)
+
+                # Track aggression
+                if action.action_type == ActionType.CALL:
+                    acc.calls += 1
+                elif action.action_type in (ActionType.BET, ActionType.RAISE, ActionType.ALL_IN):
+                    if action.action_type == ActionType.BET:
+                        acc.bets += 1
+                    else:
+                        acc.raises += 1
+
+            elif action.street in (Street.TURN, Street.RIVER):
+                # Track aggression
+                if action.action_type == ActionType.CALL:
+                    acc.calls += 1
+                elif action.action_type in (ActionType.BET, ActionType.RAISE, ActionType.ALL_IN):
+                    if action.action_type == ActionType.BET:
+                        acc.bets += 1
+                    else:
+                        acc.raises += 1
+
+        # Update VPIP counter (voluntarily put in pot)
+        if has_preflop_action:
+            acc.vpip_counter.add_opportunity(put_money_preflop)
+
+        # Update PFR counter (preflop raise)
+        if has_preflop_action:
+            acc.pfr_counter.add_opportunity(raised_preflop)
+
+        # Update WTSD counter (went to showdown given saw flop)
+        if saw_flop:
+            acc.wtsd_counter.add_opportunity(hand.went_to_showdown)
+
+        # Update WSD counter (won at showdown given went to showdown)
+        if hand.went_to_showdown:
+            acc.wsd_counter.add_opportunity(hand.won_at_showdown)
 
     def get_stats(self, player_id: str) -> PlayerStats | None:
         """

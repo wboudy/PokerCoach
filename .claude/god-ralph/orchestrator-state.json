@@ -1,15 +1,13 @@
 {
   "status": "running",
-  "started_at": "2026-01-14T05:20:00Z",
-  "wave": 2,
+  "started_at": "2026-01-14T05:35:00Z",
+  "batch": 3,
   "active_ralphs": [],
   "completed_beads": [
     "PokerCoach-qs6", "PokerCoach-2se", "PokerCoach-ycm",
     "PokerCoach-gg8", "PokerCoach-bix", "PokerCoach-1tz",
-    "PokerCoach-8sc", "PokerCoach-22u"
+    "PokerCoach-8sc", "PokerCoach-22u", "PokerCoach-51z", "PokerCoach-bjo"
   ],
   "failed_beads": [],
-  "pending_beads": ["PokerCoach-51z", "PokerCoach-bjo", "PokerCoach-br5", "PokerCoach-8ni"],
-  "total_iterations": 0,
-  "estimated_cost": "$0.00"
+  "total_iterations": 0
 }
