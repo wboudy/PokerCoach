@@ -1,6 +1,5 @@
 """Coach API routes."""
 
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -23,12 +22,12 @@ def _get_coach(request: Request) -> PokerCoach:
 
 
 def _build_game_state(
-    hand: Optional[str] = None,
-    board: Optional[str] = None,
-    position: Optional[str] = None,
-    pot_size: Optional[float] = None,
-    to_call: Optional[float] = None,
-    effective_stack: Optional[float] = 100.0,
+    hand: str | None = None,
+    board: str | None = None,
+    position: str | None = None,
+    pot_size: float | None = None,
+    to_call: float | None = None,
+    effective_stack: float | None = 100.0,
 ) -> GameState:
     """Build a GameState from query parameters."""
     game_state = GameState(
@@ -66,32 +65,32 @@ class CoachQuery(BaseModel):
         description="Natural language poker question",
         example="Should I 3bet AKo from SB vs BTN open?",
     )
-    hand: Optional[str] = Field(
+    hand: str | None = Field(
         default=None,
         description="Hero's hole cards in standard notation",
         example="AhKs",
     )
-    board: Optional[str] = Field(
+    board: str | None = Field(
         default=None,
         description="Community cards (space-separated)",
         example="Qh Jd Tc",
     )
-    position: Optional[str] = Field(
+    position: str | None = Field(
         default=None,
         description="Hero's position at the table",
         example="SB",
     )
-    pot_size: Optional[float] = Field(
+    pot_size: float | None = Field(
         default=None,
         description="Current pot size in big blinds",
         example=6.5,
     )
-    to_call: Optional[float] = Field(
+    to_call: float | None = Field(
         default=None,
         description="Amount to call in big blinds",
         example=2.5,
     )
-    effective_stack: Optional[float] = Field(
+    effective_stack: float | None = Field(
         default=100.0,
         description="Effective stack size in big blinds",
         example=100.0,
@@ -106,12 +105,12 @@ class CoachResponse(BaseModel):
         description="Coach's natural language response",
         example="With AKo from SB vs BTN open, you should 3bet to around 10bb.",
     )
-    strategy: Optional[dict] = Field(
+    strategy: dict | None = Field(
         default=None,
         description="Recommended action frequencies",
         example={"3bet": 0.85, "call": 0.15, "fold": 0.0},
     )
-    ev_comparison: Optional[dict] = Field(
+    ev_comparison: dict | None = Field(
         default=None,
         description="EV comparison of available actions",
         example={"3bet_ev": 1.2, "call_ev": 0.8, "fold_ev": 0.0},
@@ -150,7 +149,7 @@ async def ask_coach(query: CoachQuery, request: Request) -> CoachResponse:
         raise HTTPException(
             status_code=500,
             detail=f"Error processing coach request: {str(e)}",
-        )
+        ) from None
 
 
 class GTOQuery(BaseModel):
@@ -201,7 +200,7 @@ class GTOResponse(BaseModel):
         description="Action frequencies (action -> frequency)",
         example={"fold": 0.0, "call": 0.35, "raise": 0.65},
     )
-    ev: Optional[float] = Field(
+    ev: float | None = Field(
         default=None,
         description="Expected value of the optimal mixed strategy",
         example=1.45,
@@ -234,7 +233,7 @@ async def query_gto(query: GTOQuery, request: Request) -> GTOResponse:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid hand format: {query.hand}. Use format like 'AsKs' or 'AhKd'.",
-        )
+        ) from None
 
     try:
         # Get strategy from solver
@@ -255,9 +254,9 @@ async def query_gto(query: GTOQuery, request: Request) -> GTOResponse:
         raise HTTPException(
             status_code=404,
             detail=f"No cached solution available for this spot. {str(e)}",
-        )
+        ) from None
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error querying GTO strategy: {str(e)}",
-        )
+        ) from None
