@@ -281,15 +281,26 @@ class TexasSolverBridge(SolverBridge):
 
 class PrecomputedSolver(SolverBridge):
     """
-    Solver that uses pre-computed solutions.
+    Solver that uses pre-computed solutions with dynamic fallback.
 
     Faster for common spots by looking up cached solutions
-    instead of running the solver each time.
+    instead of running the solver each time. When cache misses,
+    can optionally run solver on-the-fly with timeout and queue
+    the result for cache storage.
     """
 
-    def __init__(self, cache_dir: Path):
+    def __init__(
+        self,
+        cache_dir: Path,
+        fallback_solver: SolverBridge | None = None,
+        timeout: float = 30.0,
+    ):
         self.cache_dir = cache_dir
         self._cache: dict[str, Solution] = {}
+        self._fallback_solver = fallback_solver
+        self._timeout = timeout
+        self._pending_cache: dict[str, Solution] = {}
+        self._loading = False  # Indicates if dynamic solving is in progress
 
     def _cache_key(self, game_state: GameState) -> str:
         """Generate cache key from game state.
@@ -408,26 +419,165 @@ class PrecomputedSolver(SolverBridge):
         else:
             return "rainbow"  # No flush draw
 
+    @property
+    def is_loading(self) -> bool:
+        """Check if dynamic solving is currently in progress."""
+        return self._loading
+
     def solve(
         self,
         game_state: GameState,
         iterations: int = 1000,
         target_exploitability: float = 0.5,
     ) -> Solution:
-        """Look up pre-computed solution."""
+        """Look up pre-computed solution with dynamic fallback.
+
+        First checks memory cache, then disk cache. If both miss
+        and a fallback solver is configured, runs solver on-the-fly
+        with timeout and queues the result for cache storage.
+
+        Args:
+            game_state: Current game state to solve
+            iterations: Max iterations for convergence (for fallback)
+            target_exploitability: Target exploitability (for fallback)
+
+        Returns:
+            Solution with strategies and EVs
+
+        Raises:
+            KeyError: If no cached solution and no fallback solver configured
+        """
         key = self._cache_key(game_state)
 
+        # Try memory cache first
         if key in self._cache:
             return self._cache[key]
 
+        # Try disk cache
         cache_file = self.cache_dir / f"{key}.json"
         if cache_file.exists():
-            with open(cache_file) as f:
-                _data = json.load(f)  # noqa: F841
-                # TODO: Deserialize solution
-                raise NotImplementedError
+            solution = self._load_cached_solution(cache_file, game_state)
+            self._cache[key] = solution
+            return solution
+
+        # Dynamic fallback if available
+        if self._fallback_solver is not None:
+            solution = self._solve_with_fallback(game_state, key, iterations)
+            return solution
 
         raise KeyError(f"No cached solution for game state: {key}")
+
+    def _load_cached_solution(
+        self, cache_file: Path, game_state: GameState
+    ) -> Solution:
+        """Load solution from cache file.
+
+        Args:
+            cache_file: Path to the cache file
+            game_state: Game state for the solution
+
+        Returns:
+            Deserialized Solution object
+        """
+        with open(cache_file) as f:
+            data = json.load(f)
+
+        strategies: dict[str, Strategy] = {}
+        for hand_str, action_dict in data.get("strategies", {}).items():
+            try:
+                hand = Hand.from_string(hand_str)
+                actions: dict[ActionType, float] = {}
+                for k, v in action_dict.items():
+                    try:
+                        actions[ActionType(k)] = v
+                    except ValueError:
+                        continue
+                strategies[hand_str] = Strategy(hand=hand, actions=actions)
+            except (ValueError, KeyError):
+                continue
+
+        return Solution(
+            game_state=game_state,
+            strategies=strategies,
+            ev=data.get("ev", {}),
+            convergence=data.get("convergence", 0.0),
+            iterations=data.get("iterations", 0),
+        )
+
+    def _solve_with_fallback(
+        self,
+        game_state: GameState,
+        cache_key: str,
+        iterations: int,
+    ) -> Solution:
+        """Run solver on-the-fly and queue result for caching.
+
+        Args:
+            game_state: Current game state to solve
+            cache_key: Key for caching the result
+            iterations: Max iterations for solver
+
+        Returns:
+            Solution from fallback solver, or minimal solution on timeout
+        """
+        import time
+
+        self._loading = True
+        start = time.time()
+
+        try:
+            solution = self._fallback_solver.solve(
+                game_state,
+                iterations=iterations,
+            )
+
+            # Queue for cache storage if completed within timeout
+            elapsed = time.time() - start
+            if elapsed < self._timeout:
+                self._cache[cache_key] = solution
+                self._pending_cache[cache_key] = solution
+
+            return solution
+
+        except TimeoutError:
+            # Return minimal strategy on timeout
+            return Solution(
+                game_state=game_state,
+                strategies={},
+                ev={},
+                convergence=float("inf"),
+                iterations=0,
+            )
+        finally:
+            self._loading = False
+
+    def flush_pending_cache(self) -> int:
+        """Write pending solutions to disk cache.
+
+        Should be called periodically to persist dynamically
+        computed solutions.
+
+        Returns:
+            Number of solutions written to disk
+        """
+        count = 0
+        for key, solution in self._pending_cache.items():
+            cache_file = self.cache_dir / f"{key}.json"
+            data = {
+                "strategies": {
+                    hand_str: {a.value: f for a, f in strat.actions.items()}
+                    for hand_str, strat in solution.strategies.items()
+                },
+                "ev": solution.ev,
+                "convergence": solution.convergence,
+                "iterations": solution.iterations,
+            }
+            with open(cache_file, "w") as f:
+                json.dump(data, f)
+            count += 1
+
+        self._pending_cache.clear()
+        return count
 
     def get_strategy(self, game_state: GameState, hand: Hand) -> Strategy:
         solution = self.solve(game_state)

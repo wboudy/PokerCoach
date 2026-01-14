@@ -1,0 +1,74 @@
+{
+  "spot_name": "wet_broadway_oop_srp",
+  "board": [
+    "Ks",
+    "Qd",
+    "Jc"
+  ],
+  "pot": 6.0,
+  "effective_stack": 94.0,
+  "street": "flop",
+  "position": "oop",
+  "strategies": {
+    "AA": {
+      "bet": 0.75,
+      "check": 0.25
+    },
+    "KK": {
+      "bet": 0.65,
+      "check": 0.35
+    },
+    "QQ": {
+      "bet": 0.6,
+      "check": 0.4
+    },
+    "JJ": {
+      "bet": 0.5,
+      "check": 0.5
+    },
+    "TT": {
+      "bet": 0.44999999999999996,
+      "check": 0.55
+    },
+    "AhKh": {
+      "bet": 0.4999999999999999,
+      "check": 0.5000000000000001
+    },
+    "AhQh": {
+      "bet": 0.44999999999999996,
+      "check": 0.55
+    },
+    "KhQh": {
+      "bet": 0.3999999999999999,
+      "check": 0.6000000000000001
+    },
+    "JhTh": {
+      "bet": 0.30000000000000004,
+      "check": 0.7
+    },
+    "Th9h": {
+      "bet": 0.25,
+      "check": 0.75
+    },
+    "7h2c": {
+      "bet": 0.0,
+      "check": 1.0
+    },
+    "8h3c": {
+      "bet": 0.0,
+      "check": 1.0
+    },
+    "9h4c": {
+      "bet": 0.0,
+      "check": 1.0
+    },
+    "6h2d": {
+      "bet": 0.0,
+      "check": 1.0
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}

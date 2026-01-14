@@ -1,0 +1,74 @@
+{
+  "spot_name": "dry_high_oop_srp",
+  "board": [
+    "As",
+    "7d",
+    "2c"
+  ],
+  "pot": 6.0,
+  "effective_stack": 94.0,
+  "street": "flop",
+  "position": "oop",
+  "strategies": {
+    "AA": {
+      "bet": 0.85,
+      "check": 0.15000000000000002
+    },
+    "KK": {
+      "bet": 0.85,
+      "check": 0.15000000000000002
+    },
+    "QQ": {
+      "bet": 0.7999999999999999,
+      "check": 0.20000000000000007
+    },
+    "JJ": {
+      "bet": 0.7,
+      "check": 0.30000000000000004
+    },
+    "TT": {
+      "bet": 0.6499999999999999,
+      "check": 0.3500000000000001
+    },
+    "AhKh": {
+      "bet": 0.7,
+      "check": 0.30000000000000004
+    },
+    "AhQh": {
+      "bet": 0.65,
+      "check": 0.35
+    },
+    "KhQh": {
+      "bet": 0.6,
+      "check": 0.4
+    },
+    "JhTh": {
+      "bet": 0.5,
+      "check": 0.5
+    },
+    "Th9h": {
+      "bet": 0.44999999999999996,
+      "check": 0.55
+    },
+    "7h2c": {
+      "bet": 0.1,
+      "check": 0.9
+    },
+    "8h3c": {
+      "bet": 0.05000000000000002,
+      "check": 0.95
+    },
+    "9h4c": {
+      "bet": 0.05000000000000002,
+      "check": 0.95
+    },
+    "6h2d": {
+      "bet": 2.7755575615628914e-17,
+      "check": 1.0
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "spot_name": "dry_high_ip_3bet",
+  "board": [
+    "As",
+    "7d",
+    "2c"
+  ],
+  "pot": 18.0,
+  "effective_stack": 82.0,
+  "street": "flop",
+  "position": "ip",
+  "strategies": {
+    "AA": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "KK": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "QQ": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "JJ": {
+      "bet": 0.95,
+      "check": 0.050000000000000044
+    },
+    "TT": {
+      "bet": 0.8999999999999999,
+      "check": 0.10000000000000009
+    },
+    "AhKh": {
+      "bet": 0.95,
+      "check": 0.050000000000000044
+    },
+    "AhQh": {
+      "bet": 0.9,
+      "check": 0.09999999999999998
+    },
+    "KhQh": {
+      "bet": 0.85,
+      "check": 0.15000000000000002
+    },
+    "JhTh": {
+      "bet": 0.75,
+      "check": 0.25
+    },
+    "Th9h": {
+      "bet": 0.7,
+      "check": 0.30000000000000004
+    },
+    "7h2c": {
+      "bet": 0.35,
+      "check": 0.65
+    },
+    "8h3c": {
+      "bet": 0.30000000000000004,
+      "check": 0.7
+    },
+    "9h4c": {
+      "bet": 0.30000000000000004,
+      "check": 0.7
+    },
+    "6h2d": {
+      "bet": 0.25,
+      "check": 0.75
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}

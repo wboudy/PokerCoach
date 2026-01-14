@@ -1,0 +1,74 @@
+{
+  "spot_name": "wet_connected_oop_3bet",
+  "board": [
+    "Js",
+    "Td",
+    "9c"
+  ],
+  "pot": 18.0,
+  "effective_stack": 82.0,
+  "street": "flop",
+  "position": "oop",
+  "strategies": {
+    "AA": {
+      "bet": 0.85,
+      "check": 0.15000000000000002
+    },
+    "KK": {
+      "bet": 0.75,
+      "check": 0.25
+    },
+    "QQ": {
+      "bet": 0.7,
+      "check": 0.30000000000000004
+    },
+    "JJ": {
+      "bet": 0.6,
+      "check": 0.4
+    },
+    "TT": {
+      "bet": 0.5499999999999999,
+      "check": 0.45000000000000007
+    },
+    "AhKh": {
+      "bet": 0.5999999999999999,
+      "check": 0.40000000000000013
+    },
+    "AhQh": {
+      "bet": 0.5499999999999999,
+      "check": 0.45000000000000007
+    },
+    "KhQh": {
+      "bet": 0.4999999999999999,
+      "check": 0.5000000000000001
+    },
+    "JhTh": {
+      "bet": 0.4,
+      "check": 0.6
+    },
+    "Th9h": {
+      "bet": 0.35,
+      "check": 0.65
+    },
+    "7h2c": {
+      "bet": 0.1,
+      "check": 0.9
+    },
+    "8h3c": {
+      "bet": 0.1,
+      "check": 0.9
+    },
+    "9h4c": {
+      "bet": 0.1,
+      "check": 0.9
+    },
+    "6h2d": {
+      "bet": 0.1,
+      "check": 0.9
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}

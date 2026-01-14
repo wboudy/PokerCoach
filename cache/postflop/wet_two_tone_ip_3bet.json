@@ -1,0 +1,74 @@
+{
+  "spot_name": "wet_two_tone_ip_3bet",
+  "board": [
+    "Qh",
+    "Jh",
+    "7c"
+  ],
+  "pot": 18.0,
+  "effective_stack": 82.0,
+  "street": "flop",
+  "position": "ip",
+  "strategies": {
+    "AA": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "KK": {
+      "bet": 0.9,
+      "check": 0.09999999999999998
+    },
+    "QQ": {
+      "bet": 0.85,
+      "check": 0.15000000000000002
+    },
+    "JJ": {
+      "bet": 0.75,
+      "check": 0.25
+    },
+    "TT": {
+      "bet": 0.7,
+      "check": 0.30000000000000004
+    },
+    "AhKh": {
+      "bet": 0.7499999999999999,
+      "check": 0.2500000000000001
+    },
+    "AhQh": {
+      "bet": 0.7,
+      "check": 0.30000000000000004
+    },
+    "KhQh": {
+      "bet": 0.6499999999999999,
+      "check": 0.3500000000000001
+    },
+    "JhTh": {
+      "bet": 0.55,
+      "check": 0.44999999999999996
+    },
+    "Th9h": {
+      "bet": 0.5,
+      "check": 0.5
+    },
+    "7h2c": {
+      "bet": 0.2,
+      "check": 0.8
+    },
+    "8h3c": {
+      "bet": 0.15000000000000002,
+      "check": 0.85
+    },
+    "9h4c": {
+      "bet": 0.15000000000000002,
+      "check": 0.85
+    },
+    "6h2d": {
+      "bet": 0.1,
+      "check": 0.9
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}

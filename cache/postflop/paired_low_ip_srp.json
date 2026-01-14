@@ -1,0 +1,74 @@
+{
+  "spot_name": "paired_low_ip_srp",
+  "board": [
+    "7s",
+    "7d",
+    "2c"
+  ],
+  "pot": 6.0,
+  "effective_stack": 94.0,
+  "street": "flop",
+  "position": "ip",
+  "strategies": {
+    "AA": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "KK": {
+      "bet": 0.9,
+      "check": 0.1
+    },
+    "QQ": {
+      "bet": 0.85,
+      "check": 0.15
+    },
+    "JJ": {
+      "bet": 0.75,
+      "check": 0.25
+    },
+    "TT": {
+      "bet": 0.7,
+      "check": 0.3
+    },
+    "AhKh": {
+      "bet": 0.7,
+      "check": 0.3
+    },
+    "AhQh": {
+      "bet": 0.65,
+      "check": 0.35
+    },
+    "KhQh": {
+      "bet": 0.6,
+      "check": 0.4
+    },
+    "JhTh": {
+      "bet": 0.5,
+      "check": 0.5
+    },
+    "Th9h": {
+      "bet": 0.45,
+      "check": 0.55
+    },
+    "7h2c": {
+      "bet": 0.15,
+      "check": 0.85
+    },
+    "8h3c": {
+      "bet": 0.1,
+      "check": 0.9
+    },
+    "9h4c": {
+      "bet": 0.1,
+      "check": 0.9
+    },
+    "6h2d": {
+      "bet": 0.05,
+      "check": 0.95
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}

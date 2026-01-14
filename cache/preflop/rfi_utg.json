@@ -1,0 +1,107 @@
+{
+  "spot_name": "rfi_utg",
+  "pot": 1.5,
+  "effective_stack": 100.0,
+  "street": "preflop",
+  "strategies": {
+    "AA": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "KK": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "QQ": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "JJ": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "TT": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "99": {
+      "raise": 0.5,
+      "fold": 0.5,
+      "call": 0.0
+    },
+    "88": {
+      "raise": 0.25,
+      "fold": 0.75,
+      "call": 0.0
+    },
+    "AKs": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "AKo": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "AQs": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "AQo": {
+      "raise": 0.75,
+      "fold": 0.25,
+      "call": 0.0
+    },
+    "AJs": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "ATs": {
+      "raise": 0.75,
+      "fold": 0.25,
+      "call": 0.0
+    },
+    "A5s": {
+      "raise": 0.5,
+      "fold": 0.5,
+      "call": 0.0
+    },
+    "KQs": {
+      "raise": 1.0,
+      "fold": 0.0,
+      "call": 0.0
+    },
+    "KQo": {
+      "raise": 0.5,
+      "fold": 0.5,
+      "call": 0.0
+    },
+    "KJs": {
+      "raise": 0.75,
+      "fold": 0.25,
+      "call": 0.0
+    },
+    "QJs": {
+      "raise": 0.5,
+      "fold": 0.5,
+      "call": 0.0
+    },
+    "JTs": {
+      "raise": 0.5,
+      "fold": 0.5,
+      "call": 0.0
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_preflop.py",
+    "source": "approximated_gto"
+  }
+}

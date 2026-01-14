@@ -1,0 +1,74 @@
+{
+  "spot_name": "dry_high_ip_srp",
+  "board": [
+    "As",
+    "7d",
+    "2c"
+  ],
+  "pot": 6.0,
+  "effective_stack": 94.0,
+  "street": "flop",
+  "position": "ip",
+  "strategies": {
+    "AA": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "KK": {
+      "bet": 1.0,
+      "check": 0.0
+    },
+    "QQ": {
+      "bet": 0.95,
+      "check": 0.04999999999999999
+    },
+    "JJ": {
+      "bet": 0.85,
+      "check": 0.15
+    },
+    "TT": {
+      "bet": 0.7999999999999999,
+      "check": 0.19999999999999998
+    },
+    "AhKh": {
+      "bet": 0.85,
+      "check": 0.15
+    },
+    "AhQh": {
+      "bet": 0.8,
+      "check": 0.19999999999999998
+    },
+    "KhQh": {
+      "bet": 0.75,
+      "check": 0.25
+    },
+    "JhTh": {
+      "bet": 0.65,
+      "check": 0.35
+    },
+    "Th9h": {
+      "bet": 0.6,
+      "check": 0.4
+    },
+    "7h2c": {
+      "bet": 0.25,
+      "check": 0.75
+    },
+    "8h3c": {
+      "bet": 0.2,
+      "check": 0.8
+    },
+    "9h4c": {
+      "bet": 0.2,
+      "check": 0.8
+    },
+    "6h2d": {
+      "bet": 0.15000000000000002,
+      "check": 0.85
+    }
+  },
+  "metadata": {
+    "generated_by": "precompute_postflop.py",
+    "source": "approximated_gto"
+  }
+}
