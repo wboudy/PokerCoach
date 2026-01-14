@@ -17,10 +17,13 @@ async def lifespan(app: FastAPI):
     # Startup: Create global coach instance
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY environment variable is required. "
-            "Please set it before starting the application."
+        import logging
+        logging.warning(
+            "ANTHROPIC_API_KEY not set. Coach endpoints will return 503. "
+            "Set the environment variable and restart to enable coaching."
         )
+        yield
+        return
 
     # Get TexasSolver path from environment (optional)
     solver_path = os.environ.get("TEXASSOLVER_PATH")
