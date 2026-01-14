@@ -143,7 +143,10 @@ build_solver() {
     # Configure cmake with platform-specific settings
     echo "  Configuring with cmake..."
 
-    local cmake_args=("-DCMAKE_BUILD_TYPE=Release")
+    local cmake_args=(
+        "-DCMAKE_BUILD_TYPE=Release"
+        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"  # Required for old googletest in TexasSolver
+    )
 
     if [ "$(uname -s)" = "Darwin" ]; then
         # macOS-specific: help cmake find libomp from Homebrew
@@ -160,6 +163,9 @@ build_solver() {
                 "-DOpenMP_C_LIB_NAMES=omp"
                 "-DOpenMP_CXX_LIB_NAMES=omp"
                 "-DOpenMP_omp_LIBRARY=$libomp_prefix/lib/libomp.dylib"
+                # Important: Link flags to include libomp at link time
+                "-DCMAKE_EXE_LINKER_FLAGS=-L$libomp_prefix/lib -lomp"
+                "-DCMAKE_SHARED_LINKER_FLAGS=-L$libomp_prefix/lib -lomp"
             )
         fi
     fi
@@ -231,10 +237,10 @@ verify_installation() {
     echo "  Binary exists and is executable"
     echo "  Binary size: $(ls -lh "$SOLVER_BINARY" | awk '{print $5}')"
 
-    # Try to run the binary with no args to see if it loads
-    # Note: console_solver may require input file, so just check it runs at all
-    if timeout 2 "$SOLVER_BINARY" --help 2>&1 | head -5 || true; then
-        :
+    # Try to run the binary to see if it loads
+    # Note: console_solver requires a config file, so we just test it starts
+    if "$SOLVER_BINARY" 2>&1 | head -1 | grep -q "command"; then
+        echo "  Binary runs successfully (awaiting config file)"
     fi
 
     echo ""
