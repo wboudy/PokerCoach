@@ -12,6 +12,41 @@ AI-powered poker coaching system that combines an LLM (Claude) with GTO solver t
 - **Real-time Coaching**: WebSocket-based live advice during sessions
 - **Post-Game Analysis**: Review decisions with solver analysis
 
+## Implementation Status
+
+### Working Features
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **LLM Coach** | ✅ Functional | Claude-based poker coaching with natural language Q&A |
+| **CLI Interface** | ✅ Functional | `pokercoach ask`, `pokercoach analyze` commands work |
+| **API Server** | ✅ Functional | FastAPI endpoints for `/api/coach/*` |
+| **Opponent Stats** | ✅ Functional | VPIP, PFR, AF, WTSD tracking via `StatsCalculator` |
+| **Player Profiling** | ✅ Functional | Classifies NIT/TAG/LAG/FISH/MANIAC from stats |
+| **Exploitation Engine** | ✅ Functional | Generates adjustments based on opponent type |
+| **Hand History Import** | ✅ Functional | PokerStars format parser |
+| **Live Opponent Tracker** | ⚠️ Partial | Core tracking logic works for manual event input |
+
+### Skeleton / Not Yet Implemented
+
+| Feature | Status | What's Missing |
+|---------|--------|----------------|
+| **Vision Detection** | 🚧 Skeleton | `detect_hole_cards()`, `detect_board()`, `detect_table_state()` all raise `NotImplementedError` |
+| **Screen Capture** | 🚧 Skeleton | Template matching scaffolding exists, no working card recognition |
+| **Site Calibration** | 🚧 Skeleton | Data classes exist, no calibration UI/wizard |
+| **Vision→Tracker Integration** | 🚧 Skeleton | `VisionIntegrationHook._detect_actions()` is a pass statement |
+| **GTO Solver Integration** | ⚠️ Partial | TexasSolver bridge exists, needs actual solver binary |
+| **Pre-computed Cache** | 🚧 Planned | Cache structure defined, no actual solutions cached |
+| **WebSocket Live Updates** | 🚧 Skeleton | Endpoint exists, no real-time vision pipeline |
+
+### Roadmap
+
+1. **Vision Pipeline** - Implement card detection using template matching or VLM
+2. **Site Calibration Wizard** - Interactive region selection for different poker clients
+3. **Solver Cache Warming** - Pre-compute common spots for instant lookups
+4. **Real-time Integration** - Connect vision → tracking → coaching pipeline
+5. **Frontend UI** - React overlay for live coaching display
+
 ## Prerequisites
 
 - **Python 3.11+** (uv recommended for dependency management)
