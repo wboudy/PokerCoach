@@ -1,15 +1,15 @@
 {
   "status": "running",
-  "started_at": "2026-01-14T05:15:00Z",
-  "batch": 2,
-  "active_ralphs": [
-    {"id": "a317d81", "bead": "PokerCoach-8sc", "task": "_build_command"},
-    {"id": "a096216", "bead": "PokerCoach-22u", "task": "HandRepository CRUD"},
-    {"id": "a6e3383", "bead": "PokerCoach-gg8", "task": "opponent stats schema"},
-    {"id": "ae274b2", "bead": "PokerCoach-bix", "task": "coaching window layout"},
-    {"id": "ad3afe6", "bead": "PokerCoach-1tz", "task": "game state sync"}
+  "started_at": "2026-01-14T05:20:00Z",
+  "wave": 2,
+  "active_ralphs": [],
+  "completed_beads": [
+    "PokerCoach-qs6", "PokerCoach-2se", "PokerCoach-ycm",
+    "PokerCoach-gg8", "PokerCoach-bix", "PokerCoach-1tz",
+    "PokerCoach-8sc", "PokerCoach-22u"
   ],
-  "completed_beads": [],
   "failed_beads": [],
-  "total_iterations": 0
+  "pending_beads": ["PokerCoach-51z", "PokerCoach-bjo", "PokerCoach-br5", "PokerCoach-8ni"],
+  "total_iterations": 0,
+  "estimated_cost": "$0.00"
 }
