@@ -1,10 +1,12 @@
 """PokerCoach CLI."""
 
+import os
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 app = typer.Typer(
@@ -20,34 +22,202 @@ def ask(
     hand: Optional[str] = typer.Option(None, "--hand", "-h", help="Your hand (e.g., 'AsKs')"),
     board: Optional[str] = typer.Option(None, "--board", "-b", help="Board cards"),
     position: Optional[str] = typer.Option(None, "--position", "-p", help="Your position"),
+    pot: Optional[float] = typer.Option(None, "--pot", help="Current pot size in BBs"),
+    stack: Optional[float] = typer.Option(None, "--stack", "-s", help="Effective stack in BBs"),
 ):
     """Ask the poker coach a question."""
-    console.print(f"[bold]Question:[/bold] {question}")
+    from pokercoach.core.game_state import Board, Card, GameState, Hand as PokerHand, Player
+    from pokercoach.core.game_state import Position as GamePosition
+    from pokercoach.llm.coach import CoachConfig, PokerCoach
+    from pokercoach.solver.texas_solver import PrecomputedSolver, TexasSolverBridge, TexasSolverConfig
 
+    # Read API key from environment
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        console.print("[red]Error: ANTHROPIC_API_KEY environment variable not set.[/red]")
+        console.print("Set it with: export ANTHROPIC_API_KEY='your-key'")
+        raise typer.Exit(1)
+
+    # Read solver path from environment (optional)
+    solver_path_str = os.environ.get("TEXASSOLVER_PATH")
+    fallback_solver: Optional[TexasSolverBridge] = None
+    if solver_path_str:
+        solver_path = Path(solver_path_str)
+        if solver_path.exists():
+            solver_config = TexasSolverConfig(binary_path=solver_path)
+            fallback_solver = TexasSolverBridge(solver_config)
+
+    # Create PrecomputedSolver with cache fallback
+    cache_dir = Path(__file__).parent.parent.parent / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    solver = PrecomputedSolver(
+        cache_dir=cache_dir,
+        fallback_solver=fallback_solver,
+    )
+
+    # Create coach instance
+    config = CoachConfig(api_key=api_key)
+    coach = PokerCoach(config=config, solver=solver)
+
+    # Build GameState from options
+    game_state: Optional[GameState] = None
+    if hand or board or position or pot or stack:
+        game_state = GameState(
+            pot=pot if pot else 3.0,
+            effective_stack=stack if stack else 100.0,
+        )
+
+        # Parse position
+        if position:
+            try:
+                game_state.hero_position = GamePosition(position.upper())
+            except (ValueError, KeyError):
+                console.print(f"[yellow]Warning: Unknown position '{position}', using BTN[/yellow]")
+                game_state.hero_position = GamePosition.BTN
+
+        # Parse board cards
+        if board:
+            board_cards = board.replace(",", " ").split()
+            for card_str in board_cards:
+                card_str = card_str.strip()
+                if len(card_str) >= 2:
+                    try:
+                        card = Card.from_string(card_str)
+                        game_state.board.add_card(card)
+                    except (ValueError, KeyError):
+                        console.print(f"[yellow]Warning: Invalid board card '{card_str}'[/yellow]")
+
+        # Parse hero's hand and create hero player
+        if hand:
+            try:
+                hero_hand = PokerHand.from_string(hand)
+                hero_player = Player(
+                    position=game_state.hero_position or GamePosition.BTN,
+                    stack=game_state.effective_stack,
+                    hand=hero_hand,
+                    is_hero=True,
+                )
+                game_state.players.append(hero_player)
+            except (ValueError, KeyError):
+                console.print(f"[yellow]Warning: Invalid hand format '{hand}'[/yellow]")
+
+    # Display context
+    console.print(f"[bold]Question:[/bold] {question}")
     if hand:
         console.print(f"[dim]Hand: {hand}[/dim]")
     if board:
         console.print(f"[dim]Board: {board}[/dim]")
     if position:
         console.print(f"[dim]Position: {position}[/dim]")
+    if pot:
+        console.print(f"[dim]Pot: {pot} BB[/dim]")
+    if stack:
+        console.print(f"[dim]Stack: {stack} BB[/dim]")
 
-    console.print("\n[yellow]Coach integration not yet implemented.[/yellow]")
-    console.print("Run 'pokercoach serve' to start the web interface.")
+    console.print()
+
+    # Call coach and print response
+    with console.status("[bold green]Thinking...[/bold green]"):
+        try:
+            response = coach.ask(question, game_state)
+            console.print(Panel(response, title="[bold]Coach Response[/bold]", border_style="green"))
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(1)
 
 
 @app.command()
 def analyze(
     file: Path = typer.Argument(..., help="Hand history file to analyze"),
-    format: str = typer.Option("pokerstars", "--format", "-f", help="File format"),
+    format: Optional[str] = typer.Option(None, "--format", "-f", help="File format (auto-detected if not specified)"),
+    hero: str = typer.Option("Hero", "--hero", help="Hero's screen name"),
 ):
     """Analyze a hand history file."""
+    from pokercoach.storage.database import Database
+    from pokercoach.storage.hand_repository import HandRepository
+    from pokercoach.storage.importer import HandHistoryImporter, PokerStarsParser
+
     if not file.exists():
         console.print(f"[red]File not found: {file}[/red]")
         raise typer.Exit(1)
 
     console.print(f"[bold]Analyzing:[/bold] {file}")
-    console.print(f"[dim]Format: {format}[/dim]")
-    console.print("\n[yellow]Analysis not yet implemented.[/yellow]")
+
+    # Detect format from flag or filename
+    detected_format = format
+    if detected_format is None:
+        # Try to auto-detect from filename
+        filename_lower = file.name.lower()
+        if "pokerstars" in filename_lower or "ps_" in filename_lower:
+            detected_format = "pokerstars"
+        elif "ggpoker" in filename_lower or "gg_" in filename_lower:
+            detected_format = "ggpoker"
+        elif "partypoker" in filename_lower:
+            detected_format = "partypoker"
+        else:
+            # Default to pokerstars, will try to detect from content
+            detected_format = None
+
+    console.print(f"[dim]Format: {detected_format or 'auto-detect'}[/dim]")
+    console.print(f"[dim]Hero: {hero}[/dim]")
+    console.print()
+
+    # Create database and repository
+    db_path = Path(__file__).parent.parent.parent / "data" / "pokercoach.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    database = Database(db_path=db_path)
+    db_session = database.get_session()
+    repository = HandRepository(session=db_session)
+
+    # Create importer with appropriate parser
+    importer = HandHistoryImporter(repository=repository, hero_name=hero)
+
+    # Import hands from file
+    with console.status("[bold green]Importing hands...[/bold green]"):
+        try:
+            result = importer.import_from_file(file, site=detected_format)
+        except Exception as e:
+            console.print(f"[red]Import error: {e}[/red]")
+            db_session.close()
+            raise typer.Exit(1)
+
+    # Print summary
+    console.print("[bold]Import Summary[/bold]")
+    console.print()
+
+    summary_table = Table(show_header=False, box=None)
+    summary_table.add_column("Metric", style="cyan")
+    summary_table.add_column("Value", style="green")
+
+    summary_table.add_row("Hands imported", str(result.hands_imported))
+    summary_table.add_row("Hands failed", str(result.hands_failed))
+
+    console.print(summary_table)
+
+    # Print errors if any
+    if result.errors:
+        console.print()
+        console.print(f"[yellow]Errors ({len(result.errors)}):[/yellow]")
+        for error in result.errors[:5]:  # Show first 5 errors
+            console.print(f"  [dim]- {error}[/dim]")
+        if len(result.errors) > 5:
+            console.print(f"  [dim]... and {len(result.errors) - 5} more[/dim]")
+
+    # Print stats
+    if result.hands_imported > 0:
+        console.print()
+        console.print("[bold]Statistics[/bold]")
+
+        # Query some basic stats from imported hands
+        total_hands = repository.count_hands()
+        console.print(f"[dim]Total hands in database: {total_hands}[/dim]")
+
+    db_session.close()
+
+    if result.hands_imported == 0 and result.hands_failed > 0:
+        console.print()
+        console.print("[yellow]No hands imported. Check the file format and hero name.[/yellow]")
+        raise typer.Exit(1)
 
 
 @app.command()

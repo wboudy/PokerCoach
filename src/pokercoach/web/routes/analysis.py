@@ -1,7 +1,7 @@
 """Analysis API routes."""
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 router = APIRouter()
@@ -10,34 +10,109 @@ router = APIRouter()
 class SessionSummary(BaseModel):
     """Summary of an analysis session."""
 
-    session_id: str
-    hands_played: int
-    accuracy_score: float
-    total_ev_loss: float
-    blunders: int
-    mistakes: int
-    inaccuracies: int
+    session_id: str = Field(
+        ...,
+        description="Unique identifier for the session",
+        example="session_2024_01_15_001",
+    )
+    hands_played: int = Field(
+        ...,
+        description="Total number of hands in the session",
+        example=847,
+    )
+    accuracy_score: float = Field(
+        ...,
+        description="Overall accuracy score (0-100)",
+        example=78.5,
+    )
+    total_ev_loss: float = Field(
+        ...,
+        description="Total EV lost in big blinds",
+        example=12.3,
+    )
+    blunders: int = Field(
+        ...,
+        description="Number of major mistakes (>2bb EV loss)",
+        example=3,
+    )
+    mistakes: int = Field(
+        ...,
+        description="Number of moderate mistakes (0.5-2bb EV loss)",
+        example=8,
+    )
+    inaccuracies: int = Field(
+        ...,
+        description="Number of minor mistakes (<0.5bb EV loss)",
+        example=15,
+    )
 
 
 class HandAnalysis(BaseModel):
     """Analysis of a single hand."""
 
-    hand_id: str
-    hero_hand: str
-    board: str
-    accuracy_score: float
-    ev_loss: float
-    decisions: list[dict]
+    hand_id: str = Field(
+        ...,
+        description="Unique identifier for the hand",
+        example="hand_123456789",
+    )
+    hero_hand: str = Field(
+        ...,
+        description="Hero's hole cards",
+        example="AsKs",
+    )
+    board: str = Field(
+        ...,
+        description="Full board (space-separated)",
+        example="Ah 7d 2c 9s Kh",
+    )
+    accuracy_score: float = Field(
+        ...,
+        description="Accuracy score for this hand (0-100)",
+        example=85.0,
+    )
+    ev_loss: float = Field(
+        ...,
+        description="EV lost in this hand (in big blinds)",
+        example=0.45,
+    )
+    decisions: list[dict] = Field(
+        ...,
+        description="List of decision points with analysis",
+        example=[
+            {"street": "preflop", "action": "raise", "ev_diff": 0.0},
+            {"street": "flop", "action": "cbet", "ev_diff": -0.2},
+        ],
+    )
 
 
 class LeakSummary(BaseModel):
     """Summary of detected leaks."""
 
-    name: str
-    description: str
-    severity: float
-    sample_size: int
-    avg_ev_loss: float
+    name: str = Field(
+        ...,
+        description="Name of the detected leak",
+        example="Over-folding to river raises",
+    )
+    description: str = Field(
+        ...,
+        description="Detailed description of the leak",
+        example="You fold 68% to river raises vs GTO of 45%. Exploitable by bluff-heavy villains.",
+    )
+    severity: float = Field(
+        ...,
+        description="Severity score (0-10)",
+        example=7.5,
+    )
+    sample_size: int = Field(
+        ...,
+        description="Number of situations in the sample",
+        example=42,
+    )
+    avg_ev_loss: float = Field(
+        ...,
+        description="Average EV loss per occurrence (in big blinds)",
+        example=1.8,
+    )
 
 
 @router.post("/upload")

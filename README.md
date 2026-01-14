@@ -12,6 +12,45 @@ AI-powered poker coaching system that combines an LLM (Claude) with GTO solver t
 - **Real-time Coaching**: WebSocket-based live advice during sessions
 - **Post-Game Analysis**: Review decisions with solver analysis
 
+## Prerequisites
+
+- **Python 3.11+** (uv recommended for dependency management)
+- **Anthropic API key** (required for LLM coach)
+- **TexasSolver binary** (download from https://github.com/bupticybee/TexasSolver/releases)
+
+## TexasSolver Installation (macOS)
+
+Download and extract the TexasSolver binary:
+
+```bash
+# Download the macOS release
+curl -L -o TexasSolver-MacOs.zip "https://github.com/bupticybee/TexasSolver/releases/download/v0.2.0/TexasSolver-v0.2.0-MacOs.zip"
+
+# Extract the archive
+unzip TexasSolver-MacOs.zip
+
+# Set the environment variable (add to your shell profile for persistence)
+export TEXASSOLVER_PATH="$PWD/TexasSolver-v0.2.0-MacOs/console_solver"
+```
+
+For Windows/Linux, download the appropriate release from the [TexasSolver releases page](https://github.com/bupticybee/TexasSolver/releases).
+
+## Environment Setup
+
+Set these environment variables before running PokerCoach:
+
+```bash
+# Required: Anthropic API key for the LLM coach
+export ANTHROPIC_API_KEY='sk-ant-...'
+
+# Required: Path to the TexasSolver binary
+export TEXASSOLVER_PATH='/path/to/console_solver'
+
+# Optional: For persistent configuration, add to ~/.bashrc or ~/.zshrc
+echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
+echo 'export TEXASSOLVER_PATH="/path/to/console_solver"' >> ~/.zshrc
+```
+
 ## Quick Start
 
 ```bash
@@ -27,28 +66,166 @@ uv run uvicorn pokercoach.web.app:app --reload
 # The API will be available at http://localhost:8000
 ```
 
-## Usage Examples
+## Usage - API
 
-### 1. Ask the AI Coach
+Start the FastAPI server and access the REST API or Swagger documentation.
+
+### Start the Server
+
+```bash
+# Development mode with auto-reload
+uv run uvicorn pokercoach.web.app:app --reload
+
+# Production mode
+uv run uvicorn pokercoach.web.app:app --host 0.0.0.0 --port 8000
+```
+
+### Swagger Documentation
+
+Open http://localhost:8000/docs in your browser to access the interactive API documentation.
+
+### Example API Requests
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Ask the coach a question
+curl -X POST http://localhost:8000/api/coach/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Should I 3bet AKo from SB vs BTN open?",
+    "context": {
+      "hand": "AcKs",
+      "position": "SB",
+      "villain_position": "BTN",
+      "villain_action": "raise 2.5bb"
+    }
+  }'
+
+# Response example:
+# {
+#   "answer": "Yes, 3-betting AKo from the SB vs a BTN open is standard GTO play...",
+#   "recommended_action": "raise",
+#   "sizing": "9-10bb",
+#   "solver_data": {
+#     "raise_frequency": 0.85,
+#     "call_frequency": 0.15,
+#     "fold_frequency": 0.0
+#   }
+# }
+
+# Get opponent stats
+curl http://localhost:8000/api/opponents/villain123/stats
+
+# WebSocket for live game state (use wscat or similar)
+wscat -c ws://localhost:8000/api/ws/game-state
+```
+
+## Usage - CLI
+
+The `pokercoach` CLI provides quick access to coaching and analysis features.
+
+### Ask the Coach
+
+```bash
+# Basic question
+pokercoach ask 'Should I 3bet here?'
+
+# With hand and position context
+pokercoach ask 'What should I do?' --hand AhKs --position BTN
+
+# With board context
+pokercoach ask 'Should I cbet?' --hand QhQs --board 'Kc 7d 2h' --position CO
+```
+
+### Analyze Hand History
+
+```bash
+# Analyze a single hand history file
+pokercoach analyze hand_history.txt
+
+# Specify the format (default: pokerstars)
+pokercoach analyze hand_history.txt --format pokerstars
+```
+
+### Cache Management
+
+```bash
+# Warm the solver cache with precomputed GTO solutions
+pokercoach cache warm
+
+# Warm only preflop spots
+pokercoach cache warm --spots=preflop
+
+# Preview what would be generated
+pokercoach cache warm --dry-run
+
+# Force regeneration of existing cache
+pokercoach cache warm --force
+
+# Show cache statistics
+pokercoach cache stats
+
+# Clear the cache
+pokercoach cache clear --yes
+```
+
+### Other Commands
+
+```bash
+# Start the web server
+pokercoach serve --port 8000 --reload
+
+# Start live screen capture (for live coaching)
+pokercoach capture --site pokerstars
+
+# Run calibration for screen capture
+pokercoach capture --calibrate
+
+# View tracked players
+pokercoach players --limit 20
+
+# Show version
+pokercoach version
+```
+
+## Usage - Python Library
+
+Import PokerCoach modules directly for integration into your own applications.
+
+### Basic Coach Usage
 
 ```python
+import os
+from pathlib import Path
 from pokercoach.llm.coach import PokerCoach, CoachConfig
 from pokercoach.solver.texas_solver import TexasSolverBridge, TexasSolverConfig
-from pathlib import Path
 
-# Setup solver (requires TexasSolver binary)
-solver_config = TexasSolverConfig(binary_path=Path("/path/to/TexasSolver"))
+# Configure the solver
+solver_config = TexasSolverConfig(
+    binary_path=Path(os.environ.get("TEXASSOLVER_PATH", "/path/to/console_solver")),
+    threads=4,
+    accuracy=0.3,
+)
 solver = TexasSolverBridge(solver_config)
 
-# Create coach
-coach = PokerCoach(CoachConfig(api_key="your-anthropic-key"), solver)
+# Configure the coach
+coach_config = CoachConfig(
+    api_key=os.environ.get("ANTHROPIC_API_KEY"),
+    model="claude-sonnet-4-20250514",
+    temperature=0.3,
+)
+coach = PokerCoach(coach_config, solver)
 
-# Ask a question - coach will use solver tools automatically
-response = coach.ask("I have AQo in the CO, BTN opened 2.5x. Should I 3bet or call?")
+# Ask a question - the coach will use solver tools automatically
+response = coach.ask(
+    "I have AQo in the CO, BTN opened 2.5x. Should I 3bet or call?"
+)
 print(response)
 ```
 
-### 2. Query GTO Strategy Directly
+### Query GTO Strategy Directly
 
 ```python
 from pokercoach.solver.texas_solver import PrecomputedSolver
@@ -72,7 +249,7 @@ for action, freq in strategy.actions.items():
         print(f"  {action.value}: {freq*100:.1f}%")
 ```
 
-### 3. Track Opponent Stats
+### Track Opponent Stats
 
 ```python
 from pokercoach.opponent.stats import StatsCalculator, HandRecord, HandAction, Position, Street, ActionType
@@ -102,7 +279,7 @@ print(f"VPIP: {stats.vpip:.1f}%, PFR: {stats.pfr:.1f}%")
 print(f"Exploits: folds_too_much_to_3bet={profile.folds_too_much_to_3bet}")
 ```
 
-### 4. Import Hand History
+### Import Hand History
 
 ```python
 from pokercoach.storage.importer import HandHistoryImporter, PokerStarsParser
@@ -120,7 +297,7 @@ print(f"Imported: {result.hands_imported}, Failed: {result.hands_failed}")
 result = importer.import_from_directory(Path("hand_histories/"))
 ```
 
-### 5. Live Opponent Tracking (Vision Integration)
+### Live Opponent Tracking (Vision Integration)
 
 ```python
 from pokercoach.vision.tracking import LiveOpponentTracker
@@ -144,24 +321,6 @@ stats = tracker.get_player_stats("villain1")
 print(f"villain1 VPIP: {stats.vpip:.1f}%")
 
 all_stats = tracker.end_session()
-```
-
-### 6. Use the Web API
-
-```bash
-# Start server
-uv run uvicorn pokercoach.web.app:app --reload
-
-# Health check
-curl http://localhost:8000/health
-
-# Ask coach (POST)
-curl -X POST http://localhost:8000/api/coach/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "Should I 3bet AKo from SB vs BTN open?"}'
-
-# WebSocket for live game state
-wscat -c ws://localhost:8000/api/ws/game-state
 ```
 
 ## Project Structure
@@ -235,12 +394,6 @@ The `cache/` directory contains pre-computed GTO solutions for common spots:
 - Common board textures for SRP and 3bet pots
 - IP and OOP cbet frequencies
 
-## Requirements
-
-- Python 3.11+
-- [TexasSolver](https://github.com/bupticybee/TexasSolver) binary (for live solving)
-- Anthropic API key (for AI coach)
-
 ## Development
 
 ```bash
@@ -301,9 +454,9 @@ The opponent profiler classifies players into these types based on VPIP/PFR/AF s
 |------|------|-----|-------------|
 | ROCK | <12% | any | Extremely tight, only plays premiums |
 | NIT | <18% | <12% | Very tight, passive |
-| TAG | <18% | ≥18% | Tight aggressive (solid) |
-| LAG | ≥28% | ≥18% | Loose aggressive |
-| FISH | ≥28% | <12% | Loose passive (calling station) |
+| TAG | <18% | >=18% | Tight aggressive (solid) |
+| LAG | >=28% | >=18% | Loose aggressive |
+| FISH | >=28% | <12% | Loose passive (calling station) |
 | MANIAC | >35% | any, AF>3 | Very loose, very aggressive |
 
 ## License
