@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
 
 
 class Suit(Enum):
@@ -165,7 +164,7 @@ class Action:
 
     type: ActionType
     amount: float = 0.0
-    player_position: Optional[Position] = None
+    player_position: Position | None = None
 
     def __str__(self) -> str:
         if self.type in (ActionType.BET, ActionType.RAISE, ActionType.ALL_IN):
@@ -179,7 +178,7 @@ class Player:
 
     position: Position
     stack: float
-    hand: Optional[Hand] = None
+    hand: Hand | None = None
     is_hero: bool = False
 
 
@@ -193,7 +192,7 @@ class GameState:
 
     # Players
     players: list[Player] = field(default_factory=list)
-    hero_position: Optional[Position] = None
+    hero_position: Position | None = None
 
     # Current state
     board: Board = field(default_factory=Board)
@@ -209,7 +208,7 @@ class GameState:
         return self.board.street
 
     @property
-    def hero(self) -> Optional[Player]:
+    def hero(self) -> Player | None:
         """Get hero player."""
         for p in self.players:
             if p.is_hero:
@@ -223,6 +222,160 @@ class GameState:
             self.pot += action.amount
 
     def to_solver_format(self) -> str:
-        """Convert to solver input format."""
-        # Implementation depends on solver
-        raise NotImplementedError
+        """
+        Convert GameState to TexasSolver input format.
+
+        Returns a string containing commands that can be written to a file
+        and passed to TexasSolver via the -i flag.
+
+        Format example:
+            set_pot 100
+            set_effective_stack 500
+            set_board Qs,Jh,2h
+            set_range_ip AA,KK,QQ,AKs,AKo
+            set_range_oop AA,KK,QQ,AKs,AKo
+        """
+        lines: list[str] = []
+
+        # Set pot size (in chips, typically relative to BB)
+        lines.append(f"set_pot {self.pot:.0f}")
+
+        # Set effective stack (in BB)
+        lines.append(f"set_effective_stack {self.effective_stack:.0f}")
+
+        # Set board cards (comma-separated, only for postflop)
+        if self.board.cards:
+            board_str = ",".join(str(card) for card in self.board.cards)
+            lines.append(f"set_board {board_str}")
+
+        # Add action history as comment for context
+        # TexasSolver needs the current decision point, not full history
+        # But we encode the action history for documentation
+        if self.actions:
+            action_history = self._format_action_history()
+            lines.append(f"# Action history: {action_history}")
+
+        return "\n".join(lines)
+
+    def _format_action_history(self) -> str:
+        """
+        Format action history with bet sizes relative to pot/BB.
+
+        Returns human-readable string like:
+            "BTN r3x, SB call, BB fold"
+        """
+        if not self.actions:
+            return ""
+
+        formatted_actions: list[str] = []
+        bb = self.stakes[1]  # Big blind amount
+        running_pot = self.stakes[0] + self.stakes[1]  # Start with blinds
+
+        for action in self.actions:
+            pos_str = ""
+            if action.player_position:
+                pos_str = f"{action.player_position.value} "
+
+            if action.type == ActionType.FOLD:
+                formatted_actions.append(f"{pos_str}fold")
+            elif action.type == ActionType.CHECK:
+                formatted_actions.append(f"{pos_str}check")
+            elif action.type == ActionType.CALL:
+                formatted_actions.append(f"{pos_str}call")
+                running_pot += action.amount
+            elif action.type == ActionType.BET:
+                # Format bet as percentage of pot or xBB
+                if running_pot > 0:
+                    pot_pct = (action.amount / running_pot) * 100
+                    formatted_actions.append(f"{pos_str}bet {pot_pct:.0f}%")
+                else:
+                    bb_mult = action.amount / bb
+                    formatted_actions.append(f"{pos_str}bet {bb_mult:.1f}x")
+                running_pot += action.amount
+            elif action.type == ActionType.RAISE:
+                # Format raise as xBB for preflop, pot% for postflop
+                if self.street == Street.PREFLOP:
+                    bb_mult = action.amount / bb
+                    formatted_actions.append(f"{pos_str}raise {bb_mult:.1f}x")
+                else:
+                    if running_pot > 0:
+                        pot_pct = (action.amount / running_pot) * 100
+                        formatted_actions.append(f"{pos_str}raise {pot_pct:.0f}%")
+                    else:
+                        formatted_actions.append(f"{pos_str}raise {action.amount}")
+                running_pot += action.amount
+            elif action.type == ActionType.ALL_IN:
+                bb_mult = action.amount / bb
+                formatted_actions.append(f"{pos_str}all-in {bb_mult:.1f}x")
+                running_pot += action.amount
+
+        return ", ".join(formatted_actions)
+
+    def to_solver_config(
+        self,
+        ip_range: str = "",
+        oop_range: str = "",
+        bet_sizes: dict[str, list[int]] | None = None,
+        threads: int = 6,
+        accuracy: float = 0.3,
+        max_iterations: int = 1000,
+    ) -> str:
+        """
+        Generate complete TexasSolver configuration file content.
+
+        Args:
+            ip_range: In-position player range (e.g., "AA,KK,QQ,AKs,AKo")
+            oop_range: Out-of-position player range
+            bet_sizes: Dict mapping street to list of bet sizes as pot percentages
+                       e.g., {"flop": [33, 50, 75], "turn": [50, 75], "river": [50, 100]}
+            threads: Number of solver threads
+            accuracy: Target exploitability percentage
+            max_iterations: Maximum solver iterations
+
+        Returns:
+            Complete config file content for TexasSolver
+        """
+        lines: list[str] = []
+
+        # Basic game state
+        lines.append(f"set_pot {self.pot:.0f}")
+        lines.append(f"set_effective_stack {self.effective_stack:.0f}")
+
+        # Board (only for postflop)
+        if self.board.cards:
+            board_str = ",".join(str(card) for card in self.board.cards)
+            lines.append(f"set_board {board_str}")
+
+        # Ranges
+        if ip_range:
+            lines.append(f"set_range_ip {ip_range}")
+        if oop_range:
+            lines.append(f"set_range_oop {oop_range}")
+
+        # Bet sizes (default to common sizes if not specified)
+        if bet_sizes is None:
+            bet_sizes = {
+                "flop": [33, 50, 75],
+                "turn": [50, 75, 100],
+                "river": [50, 75, 100],
+            }
+
+        # Configure bet sizes for each street and position
+        for street_name, sizes in bet_sizes.items():
+            for size in sizes:
+                lines.append(f"set_bet_sizes oop,{street_name},bet,{size}")
+                lines.append(f"set_bet_sizes ip,{street_name},bet,{size}")
+                # Also set raise sizes
+                lines.append(f"set_bet_sizes oop,{street_name},raise,{size}")
+                lines.append(f"set_bet_sizes ip,{street_name},raise,{size}")
+
+        # Solver configuration
+        lines.append(f"set_thread_num {threads}")
+        lines.append(f"set_accuracy {accuracy}")
+        lines.append(f"set_max_iteration {max_iterations}")
+
+        # Build and solve commands
+        lines.append("build_tree")
+        lines.append("start_solve")
+
+        return "\n".join(lines)

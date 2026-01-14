@@ -76,7 +76,9 @@ logs/
 
 # Solver binaries and cache
 solver_bin/
+bin/
 .solver_cache/
+.solver_build/
 
 # Vision templates (keep structure, ignore actual images)
 # src/pokercoach/vision/templates/cards/*.png
@@ -99,3 +101,6 @@ frontend/build/
 *.temp
 tmp/
 temp/
+
+# bv (beads viewer) local config and caches
+.bv/

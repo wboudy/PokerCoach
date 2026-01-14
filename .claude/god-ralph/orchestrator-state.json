@@ -1,0 +1,12 @@
+{
+  "status": "running",
+  "started_at": "2026-01-14T04:55:00Z",
+  "active_ralphs": [
+    {"id": "add5146", "bead": "PokerCoach-qs6", "task": "Build TexasSolver"},
+    {"id": "ad39945", "bead": "PokerCoach-2se", "task": "GameState.to_solver_format"},
+    {"id": "a05b24d", "bead": "PokerCoach-ycm", "task": "Hand storage schema"}
+  ],
+  "completed_beads": [],
+  "failed_beads": [],
+  "total_iterations": 0
+}
