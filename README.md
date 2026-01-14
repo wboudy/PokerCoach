@@ -15,8 +15,8 @@ AI-powered poker coaching system that combines an LLM (Claude) with GTO solver t
 ## Quick Start
 
 ```bash
-# Install dependencies
-uv sync
+# Install dependencies (with dev tools)
+uv sync --extra dev
 
 # Run tests to verify everything works
 uv run pytest
